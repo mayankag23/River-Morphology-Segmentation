@@ -114,68 +114,68 @@ class EnvironmentInfo:
         """
         Return a human-readable summary of the environment check results.
 
-        Each line uses a ✓ / ✗ / ⚠ prefix:
-            ✓ — check passed
-            ✗ — critical failure
-            ⚠ — warning (non-fatal)
+        Each line uses a [OK] / [ERROR] / [WARN] prefix:
+            [OK] — check passed
+            [ERROR] — critical failure
+            [WARN] — warning (non-fatal)
         """
         lines: list[str] = ["=" * 60, "Environment Validation Report", "=" * 60]
 
         # Python
         py_str = ".".join(str(v) for v in self.python_version)
-        status = "✓" if self.python_ok else "✗"
+        status = "[OK]" if self.python_ok else "[ERROR]"
         req = f">= {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}"
         lines.append(f"{status} Python {py_str} (required {req})")
 
         # PyTorch
         if self.torch_installed:
-            status = "✓" if self.torch_ok else "✗"
+            status = "[OK]" if self.torch_ok else "[ERROR]"
             req = f">= {_MIN_TORCH[0]}.{_MIN_TORCH[1]}"
             lines.append(f"{status} PyTorch {self.torch_version} (required {req})")
         else:
-            lines.append("✗ PyTorch — NOT INSTALLED")
+            lines.append("[ERROR] PyTorch — NOT INSTALLED")
 
         # CUDA
         if self.cuda_available:
             lines.append(
-                f"✓ CUDA {self.cuda_version} — "
+                f"[OK] CUDA {self.cuda_version} — "
                 f"{self.cuda_device_count} device(s) — "
                 f"{self.cuda_device_name}"
             )
         else:
-            lines.append("⚠ CUDA — not available (training will run on CPU; very slow)")
+            lines.append("[WARN] CUDA - not available (training will run on CPU; very slow)")
 
         # rasterio / GDAL
         if self.rasterio_installed:
-            status = "✓" if self.rasterio_ok else "✗"
+            status = "[OK]" if self.rasterio_ok else "[ERROR]"
             req = f">= {_MIN_RASTERIO[0]}.{_MIN_RASTERIO[1]}"
             gdal_str = f" (GDAL {self.gdal_version})" if self.gdal_version else ""
             lines.append(
                 f"{status} rasterio {self.rasterio_version}{gdal_str} (required {req})"
             )
         else:
-            lines.append("✗ rasterio — NOT INSTALLED")
+            lines.append("[ERROR] rasterio — NOT INSTALLED")
 
         # Warnings
         if self.warnings:
             lines.append("")
             lines.append("Warnings:")
             for w in self.warnings:
-                lines.append(f"  ⚠ {w}")
+                lines.append(f"  [WARN] {w}")
 
         # Errors
         if self.errors:
             lines.append("")
             lines.append("Critical Errors:")
             for e in self.errors:
-                lines.append(f"  ✗ {e}")
+                lines.append(f"  [ERROR] {e}")
         else:
             lines.append("")
-            lines.append("✓ All critical checks passed.")
+            lines.append("[OK] All critical checks passed.")
 
         lines.append("=" * 60)
         return "\n".join(lines)
-
+    
 
 # ==============================================================================
 # Private check helpers
@@ -346,8 +346,7 @@ def validate_environment(strict: bool = False) -> EnvironmentInfo:
     # CUDA (warning only — CPU fallback is supported)
     if not torch_info.get("cuda_available", False):
         warnings.append(
-            "CUDA is not available. Training will use CPU, which is 10–50× slower. "
-            "Use Google Colab (T4 GPU) or a local CUDA-capable machine for training."
+            "CUDA is not available. Training will use CPU, which is 10-50x slower. Use Google Colab (T4 GPU) or a local CUDA-capable machine for training."
         )
 
     # rasterio / GDAL
