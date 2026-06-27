@@ -1,0 +1,588 @@
+# ==============================================================================
+# River Morphology Segmentation System — Master Configuration File
+# ==============================================================================
+# This file is the single source of truth for all project parameters.
+# Every module reads from this file. Nothing is hardcoded in source code.
+#
+# SETUP CHECKLIST — complete in this order before running any pipeline stage:
+#   1. Set environment variables GEE_PROJECT_ID (and optionally
+#      GEE_SERVICE_ACCOUNT_KEY) in your .env file.
+#   2. Set aoi coordinates for your target river.
+#   3. Set date_range for your target imagery period.
+#   4. Run src/preprocessing/normalize.py to compute and fill
+#      preprocessing.channel_means and preprocessing.channel_stds.
+#
+# IMMUTABLE AFTER FIRST PATCH GENERATION — do NOT change these after running
+# the patch generator, as the values are baked into saved .npy files:
+#   - spectral_bands order
+#   - num_channels
+#   - patch_generation.patch_size
+# Changing them after data generation requires regenerating all patches from scratch.
+# ==============================================================================
+
+
+# ------------------------------------------------------------------------------
+# Project Information
+# ------------------------------------------------------------------------------
+project:
+  name:        "river_morphology"
+  version:     "1.0.0"
+  description: "Automated semantic segmentation of river morphology using Landsat imagery"
+  author:      ""    # Your name or organization
+
+
+# ------------------------------------------------------------------------------
+# Directory Paths
+# All values are relative to the project root directory.
+# The Config class resolves these to absolute pathlib.Path objects at runtime.
+# No directories are created automatically — run setup_project_directories()
+# (provided in Module 2) to create them before the first pipeline run.
+# ------------------------------------------------------------------------------
+paths:
+  data_dir:              "data"
+  raw_dir:               "data/raw"               # Downloaded GeoTIFFs from GEE
+  processed_dir:         "data/processed"         # Cloud-masked, composited rasters
+  patches_dir:           "data/patches"
+  patches_images_dir:    "data/patches/images"    # 512×512 input patches (.npy)
+  patches_masks_dir:     "data/patches/masks"     # 512×512 label patches (.npy uint8)
+  splits_dir:            "data/splits"            # train.txt / val.txt / test.txt
+  checkpoints_dir:       "checkpoints"            # Saved model weights (.pth)
+  outputs_dir:           "outputs"
+  geotiffs_dir:          "outputs/geotiffs"       # Final prediction GeoTIFFs
+  shapefiles_dir:        "outputs/shapefiles"     # Vectorized mask Shapefiles
+  visualizations_dir:    "outputs/visualizations"
+  logs_dir:              "logs"
+  tensorboard_dir:       "logs/tensorboard"
+
+
+# ------------------------------------------------------------------------------
+# Google Earth Engine Configuration
+#
+# CREDENTIALS ARE NOT STORED HERE.
+# Set the following environment variables in your .env file:
+#
+#   GEE_PROJECT_ID=your-gee-cloud-project-id
+#   GEE_SERVICE_ACCOUNT_KEY=/absolute/path/to/service-account.json   (optional)
+#
+# For interactive authentication (recommended for Colab), set only GEE_PROJECT_ID.
+# For non-interactive / CI / server environments, set both variables.
+# Access credentials via config.gee_project_id and config.gee_service_account_key
+# (properties that read from environment variables at call time).
+# ------------------------------------------------------------------------------
+gee:
+  max_download_size_mb:    32    # GEE hard cap per download request; auto-tiled if exceeded
+  tile_overlap_pixels:     64    # Pixel overlap between download tiles; eliminates seam artifacts
+  request_timeout_seconds: 300   # HTTP timeout for GEE API calls
+
+
+# ------------------------------------------------------------------------------
+# Area of Interest
+# Coordinates in WGS84 decimal degrees (EPSG:4326).
+#
+# REQUIRED — set these before running any GEE or preprocessing stage.
+# All four values are intentionally null to prevent accidental use of
+# stale coordinates from a previous project.
+#
+# Example — Kosi River, Bihar, India (a highly braided system):
+#   min_lon: 87.0  min_lat: 26.0  max_lon: 87.5  max_lat: 26.5
+#
+# The system raises an error if only some coordinates are set (partial config).
+# Leave all four as null if you will provide coordinates programmatically.
+# ------------------------------------------------------------------------------
+aoi:
+  min_lon: null    # Western boundary (longitude), e.g. 87.0
+  min_lat: null    # Southern boundary (latitude),  e.g. 26.0
+  max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
+  max_lat: null    # Northern boundary (latitude),  e.g. 26.5
+
+  # Safety limit: AOIs wider than this may span multiple UTM zones, causing
+  # spatial distortion in downloaded imagery. A warning is raised if exceeded.
+  max_width_degrees: 3.0
+
+
+# ------------------------------------------------------------------------------
+# Date Range for Imagery Compositing
+#
+# REQUIRED — set before running any GEE download stage.
+# Use the dry season for your target river to maximize sandbar visibility.
+# Format: YYYY-MM-DD
+# Both values must be set together, or both left null.
+# ------------------------------------------------------------------------------
+date_range:
+  start: null    # e.g. "2023-11-01"
+  end:   null    # e.g. "2024-02-28"
+
+
+# ------------------------------------------------------------------------------
+# Satellite Configuration — Landsat 8 + 9 Collection 2 Level-2
+# Using both L8 and L9 gives ~8-day revisit vs 16-day for either satellite alone.
+# Collection 2 uses LaSRC atmospheric correction (better than C1 LEDAPS).
+# ------------------------------------------------------------------------------
+satellite:
+  collections:
+    - "LANDSAT/LC08/C02/T1_L2"    # Landsat 8 OLI — operational since 2013
+    - "LANDSAT/LC09/C02/T1_L2"    # Landsat 9 OLI-2 — operational since 2021
+
+  # Collection 2 Level-2 radiometric scaling: SR = DN × scale_factor + offset
+  scale_factor: 0.0000275
+  offset:       -0.2
+
+  # Valid surface reflectance range after scaling (values outside are clipped)
+  sr_min: 0.0
+  sr_max: 1.0
+
+  # Scenes with cloud cover above this threshold are excluded before compositing
+  max_cloud_cover_percent: 20
+
+  # QA_PIXEL band bit positions for cloud/shadow masking (Landsat C2 specification)
+  qa_bits:
+    fill:          0    # Fill pixel (no data)
+    dilated_cloud: 1    # Dilated cloud (conservative cloud buffer)
+    cirrus:        2    # Cirrus cloud
+    cloud:         3    # Cloud
+    cloud_shadow:  4    # Cloud shadow
+    snow:          5    # Snow/ice
+    clear:         6    # Clear pixel
+    water:         7    # QA water flag (NOT used as our classification target)
+
+  resolution_meters: 30           # Native OLI spatial resolution for all bands used
+  output_crs:        "EPSG:4326"  # Output CRS; GEE handles reprojection automatically
+
+
+# ------------------------------------------------------------------------------
+# Spectral Bands — CANONICAL CHANNEL ORDER
+#
+# CRITICAL: This order defines the channel indices in all .npy patch files.
+# Channels 0–2 MUST be Blue/Green/Red (RGB order) because the EfficientNet-B4
+# encoder's first 3 input channels receive ImageNet pretrained weights calibrated
+# for RGB input. Channels 3–10 are initialized from scratch.
+# Changing this order after patches are saved requires full regeneration.
+#
+# Index | Name     | GEE band name | Role
+#   0     B2         SR_B2           Blue (0.45–0.51 μm) — receives ImageNet weights
+#   1     B3         SR_B3           Green — receives ImageNet weights
+#   2     B4         SR_B4           Red — receives ImageNet weights
+#   3     B5         SR_B5           NIR — learned from scratch
+#   4     B6         SR_B6           SWIR1 — learned from scratch
+#   5     B7         SR_B7           SWIR2 — learned from scratch
+#   6     MNDWI      (computed)      Primary water/sand separator
+#   7     NDWI       (computed)      Open water detection
+#   8     NDVI       (computed)      Vegetation suppressor
+#   9     BSI        (computed)      Bare soil / sand indicator
+#  10     AWEInsh    (computed)      Turbid and shadow water detection
+# ------------------------------------------------------------------------------
+spectral_bands:
+  - name: "B2"
+    gee_name: "SR_B2"
+    description: "Blue band (0.45–0.51 μm) — turbid water discrimination"
+
+  - name: "B3"
+    gee_name: "SR_B3"
+    description: "Green band (0.53–0.59 μm) — MNDWI and NDWI numerator"
+
+  - name: "B4"
+    gee_name: "SR_B4"
+    description: "Red band (0.64–0.67 μm) — BSI and NDVI denominator"
+
+  - name: "B5"
+    gee_name: "SR_B5"
+    description: "Near-infrared (0.85–0.88 μm) — NDWI, NDVI, vegetation"
+
+  - name: "B6"
+    gee_name: "SR_B6"
+    description: "SWIR1 (1.57–1.65 μm) — MNDWI and sand discrimination"
+
+  - name: "B7"
+    gee_name: "SR_B7"
+    description: "SWIR2 (2.11–2.29 μm) — AWEInsh and deep sand detection"
+
+  - name: "MNDWI"
+    gee_name: null
+    description: "(Green − SWIR1) / (Green + SWIR1) — primary water/sand separator"
+
+  - name: "NDWI"
+    gee_name: null
+    description: "(Green − NIR) / (Green + NIR) — open water detection"
+
+  - name: "NDVI"
+    gee_name: null
+    description: "(NIR − Red) / (NIR + Red) — vegetation suppressor"
+
+  - name: "BSI"
+    gee_name: null
+    description: "((SWIR1+Red)−(NIR+Blue)) / ((SWIR1+Red)+(NIR+Blue)) — bare soil/sand"
+
+  - name: "AWEInsh"
+    gee_name: null
+    description: "4×(Green−SWIR1) − (0.25×NIR + 2.75×SWIR2) — turbid/shadowed water"
+
+# Total input channels. Must equal len(spectral_bands) and model.in_channels.
+num_channels: 11
+
+
+# ------------------------------------------------------------------------------
+# Preprocessing Configuration
+# ------------------------------------------------------------------------------
+preprocessing:
+  # Percentile-based outlier clipping applied to raw surface reflectance values
+  # before index computation. Removes atmospheric artifacts and saturation spikes.
+  clip_percentile_low:  2.0
+  clip_percentile_high: 98.0
+
+  # Per-channel normalization statistics.
+  # Both values are null until src/preprocessing/normalize.py has been executed
+  # on your downloaded imagery. After computing, replace null with the output lists.
+  # Channel order: [B2, B3, B4, B5, B6, B7, MNDWI, NDWI, NDVI, BSI, AWEInsh]
+  channel_means: null
+  channel_stds:  null
+
+
+# ------------------------------------------------------------------------------
+# Label Generation Configuration
+# Threshold parameters for automatic label generation (src/labeling/auto_label.py).
+# Separated from preprocessing because these are labeling decisions, not
+# data transformation decisions.
+# ------------------------------------------------------------------------------
+label_generation:
+  # MNDWI threshold for classifying water candidates.
+  # Pixels with MNDWI > threshold are water candidates.
+  # Typical range: 0.0 (more permissive) to 0.3 (stricter).
+  water_threshold_mndwi: 0.2
+
+  # BSI threshold for classifying sand/bare soil candidates.
+  # Pixels with BSI > threshold are sand candidates (subject to sand_max_mndwi).
+  # Typical range: 0.0 to 0.2.
+  sand_threshold_bsi: 0.1
+
+  # Upper MNDWI bound for sand candidates.
+  # Sand pixels must not look like water: MNDWI must be below this value.
+  # Must be ≤ water_threshold_mndwi to prevent class overlap.
+  sand_max_mndwi: 0.2
+
+
+# ------------------------------------------------------------------------------
+# Patch Generation Configuration
+# ------------------------------------------------------------------------------
+patch_generation:
+  # Spatial size of each patch in pixels. Must be a power of 2.
+  # 512 fits on a T4 (16 GB) GPU at batch_size=8 with 11 input channels.
+  patch_size: 512
+
+  # Stride for training patch extraction.
+  # 256 = 50% overlap → generates ~4× more patches than non-overlapping.
+  train_stride: 256
+
+  # Stride for inference patch extraction.
+  # 50% overlap enables Gaussian-weighted blending to remove boundary artifacts.
+  inference_stride: 256
+
+  # Patches where fewer than this fraction of pixels are valid (non-nodata)
+  # are discarded during generation. Prevents training on cloud-filled patches.
+  min_valid_pixel_ratio: 0.7
+
+  # Sentinel value for missing or masked pixels in rasters.
+  nodata_value: -9999.0
+
+
+# ------------------------------------------------------------------------------
+# Class Definitions
+# ------------------------------------------------------------------------------
+classes:
+  num_classes: 3
+
+  # Integer label assigned to each class in mask arrays and model output.
+  labels:
+    background: 0
+    water:      1
+    sand:       2
+
+  # Ordered list where index = label integer value.
+  names: ["background", "water", "sand"]
+
+  # RGB display colors for visualization overlays.
+  colors:
+    background: [128, 128, 128]    # Gray
+    water:      [0,   119, 190]    # Blue
+    sand:       [255, 200,  87]    # Yellow
+
+
+# ------------------------------------------------------------------------------
+# Model Configuration
+#
+# Architecture is resolved dynamically from the string value below.
+# Changing 'architecture' here switches the model without any code changes.
+#
+# Supported values (segmentation_models_pytorch classes):
+#   "UnetPlusPlus"  — PRIMARY: best accuracy on small objects (sandbars, thin channels)
+#   "Unet"          — Lighter; ~3-5% lower IoU on small features than UnetPlusPlus
+#   "DeepLabV3Plus" — Good boundary sharpness; weaker on very small objects
+#   "FPN"           — Fast multi-scale; suitable for large AOIs with less detail
+#   "PSPNet"        — Strong global context; less precise on fine structures
+#   "Linknet"       — Lightest option; use only when compute is severely constrained
+#   "MAnet"         — Multi-scale attention; experimental alternative to UnetPlusPlus
+# ------------------------------------------------------------------------------
+model:
+  architecture:    "UnetPlusPlus"
+  encoder_name:    "efficientnet-b4"
+  encoder_weights: "imagenet"       # Pretrain from ImageNet; never train from scratch
+  in_channels:     11               # Must equal num_channels
+  num_classes:     3                # Must equal classes.num_classes
+
+  # U-Net++ decoder channel sizes from coarse (deepest) to fine (shallowest) scale.
+  # Ignored by architectures with fixed decoders (PSPNet, DeepLabV3Plus).
+  decoder_channels: [256, 128, 64, 32, 16]
+
+  # Attention type in decoder skip connections. null = disabled.
+  # "scse" adds Squeeze-and-Excitation attention: +0.5–1% IoU at ~10% compute cost.
+  decoder_attention_type: null
+
+  # Output activation. null = raw logits (softmax applied in loss and inference code).
+  activation: null
+
+
+# ------------------------------------------------------------------------------
+# Loss Function — Combined 0.5 × DiceLoss + 0.5 × FocalLoss
+# Dice: directly optimizes IoU proxy metric.
+# Focal: mines hard pixels (thin water channels, sandbar boundaries).
+# Weights must sum to 1.0.
+# ------------------------------------------------------------------------------
+loss:
+  dice_weight:  0.5
+  focal_weight: 0.5
+
+  # Focal loss focusing parameter. γ=2 is the standard recommendation.
+  # Higher γ = more attention on hard, misclassified pixels.
+  focal_gamma: 2.0
+
+  # Per-class weight for focal loss. null = equal weights.
+  # Example for heavy imbalance: [0.1, 0.45, 0.45] for [background, water, sand].
+  focal_alpha: null
+
+  # Dice loss smoothing to prevent division by zero.
+  dice_smooth: 1.0
+
+  dice_mode: "multiclass"
+
+
+# ------------------------------------------------------------------------------
+# Optimizer — AdamW
+# AdamW applies weight decay correctly (decoupled from gradient update).
+# ------------------------------------------------------------------------------
+optimizer:
+  name:          "AdamW"
+  learning_rate: 0.0001      # 1e-4: empirically best for pretrained encoders
+  weight_decay:  0.0001
+  betas:         [0.9, 0.999]
+  eps:           1.0e-8
+  gradient_clip_value: 1.0   # Max gradient norm; prevents exploding gradients in decoder
+
+
+# ------------------------------------------------------------------------------
+# Learning Rate Scheduler — CosineAnnealingWarmRestarts
+# Escapes local minima via periodic warm restarts.
+# ------------------------------------------------------------------------------
+scheduler:
+  name:       "CosineAnnealingWarmRestarts"
+  T_0:        20         # Length of first restart cycle in epochs
+  T_mult:     2          # Each subsequent cycle is T_mult × longer than the previous
+  eta_min:    1.0e-6     # Minimum learning rate (cosine annealing floor)
+  last_epoch: -1         # -1 starts from epoch 0
+
+
+# ------------------------------------------------------------------------------
+# Augmentation Configuration (training set only — Albumentations v1.4 API)
+# ------------------------------------------------------------------------------
+augmentation:
+  horizontal_flip_prob: 0.5
+  vertical_flip_prob:   0.5
+  random_rotate90_prob: 0.5
+
+  shift_scale_rotate:
+    enabled:     true
+    shift_limit: 0.05
+    scale_limit: 0.1
+    rotate_limit: 15
+    prob:        0.4
+
+  elastic_transform:
+    enabled: true
+    alpha:   120
+    sigma:   6
+    prob:    0.2
+
+  grid_distortion:
+    enabled: true
+    prob:    0.3
+
+  random_brightness_contrast:
+    enabled:          true
+    brightness_limit: 0.2
+    contrast_limit:   0.2
+    prob:             0.4
+
+  gauss_noise:
+    enabled:   true
+    var_limit: [0.005, 0.02]
+    prob:      0.3
+
+  coarse_dropout:
+    enabled:    true
+    max_holes:  8
+    max_height: 32
+    max_width:  32
+    fill_value: 0
+    prob:       0.3
+
+
+# ------------------------------------------------------------------------------
+# Training Configuration
+# ------------------------------------------------------------------------------
+training:
+  num_epochs:  150
+  batch_size:  8     # Per-GPU; for T4 16 GB at patch_size=512 with 11 channels
+
+  num_workers:  4    # Parallel data loading. Set to 0 on Windows if errors occur.
+  pin_memory:   true # Speeds CPU→GPU transfer. Set false for CPU-only runs.
+
+  # Effective batch = batch_size × gradient_accumulation_steps = 32
+  gradient_accumulation_steps: 4
+
+  # Automatic Mixed Precision: fp16 forward + fp32 gradients.
+  # Reduces GPU memory ~40%, speeds training 30–50%. Requires CUDA.
+  use_amp: true
+
+  early_stopping:
+    enabled:   true
+    patience:  20
+    min_delta: 0.001
+    monitor:   "val_iou"
+    mode:      "max"
+
+  checkpoint:
+    save_best_only: true
+    monitor:        "val_iou"
+    mode:           "max"
+    filename:       "best_model.pth"
+    save_last:      true
+
+  val_every_n_epochs: 1
+
+  tensorboard:
+    enabled:           true
+    log_every_n_steps: 10
+
+  # [train_ratio, val_ratio, test_ratio] — must sum to 1.0
+  train_val_test_split: [0.70, 0.15, 0.15]
+
+
+# ------------------------------------------------------------------------------
+# Inference Configuration
+# ------------------------------------------------------------------------------
+inference:
+  patch_size:  512    # Must match patch_generation.patch_size
+  stride:      256    # 50% overlap enables Gaussian-weighted tile blending
+
+  # Sigma for Gaussian weight map used in tile blending.
+  # 0.5 = tight bell; border pixels receive very low weight.
+  gaussian_sigma: 0.5
+
+  batch_size:           16     # No gradients during inference; can exceed training batch
+  confidence_threshold: 0.5   # Pixels below this probability are assigned background
+
+  # Test-Time Augmentation: average over flipped/rotated variants.
+  # Adds ~1–2% IoU at 4× inference time cost.
+  tta_enabled: false
+
+
+# ------------------------------------------------------------------------------
+# Post-processing Configuration
+# ------------------------------------------------------------------------------
+postprocessing:
+  closing:
+    enabled:     true
+    kernel_size: 5      # 5×5 structuring element (150 m at 30 m/pixel)
+    iterations:  1
+
+  opening:
+    enabled:     true
+    kernel_size: 3      # 3×3 structuring element (90 m at 30 m/pixel)
+    iterations:  1
+
+  # Connected component size filter applied per class.
+  # Deliberately small to preserve real small sandbars and thin channels.
+  # At 30 m resolution: 1 pixel = 900 m²
+  min_component_size:
+    water: 50     # Remove water patches < 50 px (< 0.045 km²)
+    sand:  100    # Remove sand patches < 100 px (< 0.090 km²)
+
+  # Remove predictions outside this buffer around the detected river corridor.
+  river_buffer_meters: 500
+
+  # Dense CRF post-processing (optional — requires pydensecrf).
+  # Set enabled: false if pydensecrf is not installed.
+  dense_crf:
+    enabled:        false
+    num_iterations: 5
+    pos_w:          3
+    pos_xy_std:     3
+    bi_w:           4
+    bi_xy_std:      49
+    bi_rgb_std:     5
+
+
+# ------------------------------------------------------------------------------
+# Export Configuration
+# ------------------------------------------------------------------------------
+export:
+  geotiff:
+    enabled:   true
+    compress:  "LZW"    # Lossless; fast random access; good ratio for discrete class maps
+    tiled:     true
+    tile_size: 256
+    overviews: true     # Build pyramids for fast rendering at low zoom levels
+    dtype:     "uint8"  # 0=background, 1=water, 2=sand — fits in uint8
+
+  shapefile:
+    enabled:            true
+    simplify_tolerance: 0.0     # Geometry simplification in map units; 0 = none
+    min_area_m2:        900     # Discard polygons smaller than one Landsat pixel
+
+  area_statistics:
+    enabled:       true
+    unit:          "km2"   # "m2", "km2", or "ha"
+    pixel_area_m2: 900     # 30 m × 30 m
+
+
+# ------------------------------------------------------------------------------
+# Reproducibility
+# ------------------------------------------------------------------------------
+reproducibility:
+  seed: 42
+
+  # Forces CUDA deterministic algorithms. Guarantees reproducibility
+  # but may reduce GPU throughput by 5–10%.
+  deterministic: true
+
+  # torch.backends.cudnn.benchmark: selects fastest convolution algorithm at startup.
+  # Disable for reproducibility.
+  benchmark: false
+
+
+# ------------------------------------------------------------------------------
+# Device Configuration
+# ------------------------------------------------------------------------------
+device:
+  # "auto" uses CUDA if available, falls back to CPU.
+  # Override with "cuda:0", "cuda:1", or "cpu" for explicit control.
+  device:   "auto"
+  num_gpus: 1
+
+
+# ------------------------------------------------------------------------------
+# Logging — references logging.yaml for Python logging system configuration
+# ------------------------------------------------------------------------------
+logging:
+  config_file:        "config/logging.yaml"    # Relative to project root
+  level:              "INFO"
+  log_filename:       "river_morphology.log"
+  error_log_filename: "river_morphology_errors.log"
