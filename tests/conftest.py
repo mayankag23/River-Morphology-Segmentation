@@ -60,7 +60,10 @@ def make_valid_config() -> dict[str, Any]:
         },
         "date_range": {"start": None, "end": None},
         "satellite": {
-            "collections":             ["LANDSAT/LC08/C02/T1_L2"],
+            "collections": [
+                "LANDSAT/LC08/C02/T1_L2",
+                "LANDSAT/LC09/C02/T1_L2"
+            ],
             "scale_factor":            0.0000275,
             "offset":                  -0.2,
             "sr_min":                  0.0,
