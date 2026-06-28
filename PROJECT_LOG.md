@@ -50,3 +50,77 @@ Features:
 Notes:
 All future modules must use EarthEngineClient.
 No module may import ee directly.
+
+## Module 4 - Landsat Collection Builder
+
+Status:APPROVED
+Completion Date: 29 june, 2026
+
+Test Status: All tests passed
+Coverage: >90%
+
+Features Implemented:
+
+- LandsatCollectionBuilder
+- Builder Pattern API
+- Automatic Sensor Selection
+- Manual Sensor Selection
+- AOI Filtering
+- Date Filtering
+- Cloud Cover Filtering
+- Modular Filter System
+- Metadata Extraction
+- CollectionResult
+- Collection Validation
+- Earth Engine Server-side Operations
+- Structured Metadata
+- Project-specific Exception Handling
+
+Architecture Decisions:
+
+- Builder Pattern frozen
+- CollectionResult is the only output
+- Metadata extraction separated from collection construction
+- Modular filtering system
+- No direct Earth Engine usage outside src/gee
+- No preprocessing inside Module 4
+
+## Module 5 - Landsat Image Preprocessing
+
+Status: APPROVED
+Completion Date: 29 june 2026
+
+Test Status:All tests passed
+Coverage: >90%
+
+Features Implemented:
+
+- LandsatPreprocessor
+- USGS Collection 2 Scale Factors
+- QA_PIXEL Masking
+- Cloud Shadow Masking
+- Snow Masking
+- Cirrus Masking
+- Band Harmonization
+- ProcessedCollectionResult
+- Composite Generation
+- Median Composite
+- Mean Composite
+- Medoid Composite
+- Mosaic Composite
+- Percentile Composite
+- Metadata Preservation
+- Server-side Processing
+
+Architecture Decisions:
+
+- Immutable ProcessedCollectionResult
+- Immutable CompositeResult
+- Modular preprocessing pipeline
+- Configurable QA masking
+- Configurable compositing
+- Common band schema across Landsat sensors
+- Server-side Earth Engine operations only
+
+## Module 6 - Spectral Feature Generation
+

@@ -235,6 +235,22 @@ preprocessing:
   # Channel order: [B2, B3, B4, B5, B6, B7, MNDWI, NDWI, NDVI, BSI, AWEInsh]
   channel_means: null
   channel_stds:  null
+# ---------- Add to existing preprocessing section -----
+  # ... existing fields preserved ...
+  mask_fill:          true
+  mask_cloud:         true
+  mask_cloud_shadow:  true
+  mask_snow:          false
+  mask_cirrus:        true
+  mask_dilated_cloud: true
+  thermal_scale_factor: 0.00341802
+  thermal_offset:       149.0
+  clip_to_valid_range:  true
+
+# ---------- New composite section ----------
+composite:
+  method:           "median"   # median | mean | medoid | mosaic | percentile
+  percentile_value: 50         # only used when method = percentile
 
 
 # ------------------------------------------------------------------------------
@@ -586,3 +602,5 @@ logging:
   level:              "INFO"
   log_filename:       "river_morphology.log"
   error_log_filename: "river_morphology_errors.log"
+
+#----------------------------------------------------------------------------------

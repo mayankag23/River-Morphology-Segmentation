@@ -49,3 +49,31 @@ MetadataExtractor           (metadata.py)
     +-- returns CollectionMetadata
 
 ## Module 5:
+LandsatPreprocessor          (preprocessing.py)
+    |
+    +-- _apply_scaling()          <- closure: _make_scale_function()
+    |       |
+    |       +-- image.select('SR_B.*').multiply().add()  [server-side]
+    |       +-- image.select('ST_B.*').multiply().add()  [server-side]
+    |
+    +-- _apply_masking()          <- LandsatQAMasker.apply_to_collection()
+    |       |                        (masking.py)
+    |       +-- QAMaskConfig      <- frozen dataclass (configurable flags)
+    |       +-- _build_qa_mask()  <- bitwiseAnd chains  [server-side]
+    |
+    +-- _apply_harmonization()    <- BandHarmonizer.harmonize_collection()
+    |       |                        (harmonization.py)
+    |       +-- ee.Algorithms.If(is_oli, rename_oli, rename_tm_etm)  [server-side]
+    |
+    +-- returns ProcessedCollectionResult
+
+LandsatCompositor            (composite.py)
+    +-- build_composite(ProcessedCollectionResult, method) -> CompositeResult
+         |
+         +-- _median()     collection.median()                [server-side]
+         +-- _mean()       collection.mean()                  [server-side]
+         +-- _mosaic()     collection.mosaic()                [server-side]
+         +-- _medoid()     qualityMosaic(-distance)           [server-side]
+         +-- _percentile() collection.reduce(Reducer.pct)    [server-side]
+
+## Module 6:
