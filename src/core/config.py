@@ -891,7 +891,7 @@ class Config:
             and self._logging_config_path.exists()
         ):
             with open(self._logging_config_path, "r", encoding="utf-8") as fh:
-                log_cfg = yaml.safe_load(fh)
+                log_cfg = yaml.safe_load(fh) or {}
 
             handlers = log_cfg.get("handlers", {})
 
