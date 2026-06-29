@@ -1,13 +1,10 @@
 ## Module 1: Core configuration system
 
 Date: 27 june, 2026
-Commit: Implement Module 1: 
 
-Status:
-Passed all 137 tests
+Status:Passed all 137 tests
 
-Coverage:
-85%
+Coverage:85%
 
 Notes:
 Configuration system completed.
@@ -15,13 +12,26 @@ Environment validation completed.
 Logging completed.
 Exception hierarchy completed.
 
+src/core/
+│── __init__.py
+│── config.py
+│── exceptions.py
+│── environment.py
+
+config/
+│── config.yaml
+│── logging.yaml
+
+tests/
+│── test_config.py
+
 ## Module 2 - Bootstrap & Directory Management
 
-**Date:** 2026-06-28
+Date: 2026-06-28
 
-**Status:** Completed
+Status: Completed
 
-**Tests:** All passed
+Tests: All passed
 
 **Files Added/Modified**
 - main.py
@@ -31,6 +41,19 @@ Exception hierarchy completed.
 - tests/test_bootstrap.py
 - tests/test_directories.py
 - tests/test_main.py
+
+src/core/
+│── bootstrap.py
+│── directories.py
+
+Project Root
+│── main.py
+
+tests/
+│── conftest.py
+│── test_bootstrap.py
+│── test_directories.py
+│── test_main.py
 
 ## Module 3: Google Earth Engine Client
 Version: v0.3.0
@@ -50,6 +73,17 @@ Features:
 Notes:
 All future modules must use EarthEngineClient.
 No module may import ee directly.
+
+src/gee/
+│── __init__.py
+│── auth.py
+│── client.py
+│── health.py
+
+tests/
+│── test_auth.py
+│── test_client.py
+│── test_health.py
 
 ## Module 4 - Landsat Collection Builder
 
@@ -84,6 +118,12 @@ Architecture Decisions:
 - Modular filtering system
 - No direct Earth Engine usage outside src/gee
 - No preprocessing inside Module 4
+
+src/gee/
+│── collections.py
+
+tests/
+│── test_collections.py
 
 ## Module 5 - Landsat Image Preprocessing
 
@@ -122,6 +162,18 @@ Architecture Decisions:
 - Common band schema across Landsat sensors
 - Server-side Earth Engine operations only
 
+src/gee/
+│── masking.py
+│── harmonization.py
+│── preprocessing.py
+│── composite.py
+
+tests/
+│── test_masking.py
+│── test_harmonization.py
+│── test_preprocessing.py
+│── test_composite.py
+
 ## Module 6 - Spectral Feature Engineering Pipeline
 
 Status:APPROVED
@@ -159,6 +211,19 @@ Architecture Decisions:
 - Server-side Earth Engine computation
 - No getInfo() during feature generation
 
+src/gee/
+│── indices.py
+│── registry.py
+│── feature_stack.py
+│── features.py
+
+tests/
+│── test_indices.py
+│── test_registry.py
+│── test_feature_stack.py
+│── test_features.py
+
 ## Module 7 - GeoTIFF Export & Dataset Generation
+
 
 
