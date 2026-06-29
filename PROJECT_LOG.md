@@ -122,5 +122,43 @@ Architecture Decisions:
 - Common band schema across Landsat sensors
 - Server-side Earth Engine operations only
 
-## Module 6 - Spectral Feature Generation
+## Module 6 - Spectral Feature Engineering Pipeline
+
+Status:APPROVED
+
+Completion Date:29 june, 2026
+Test Status: All tests passed
+Coverage:>90%
+
+Features Implemented:
+
+- SpectralFeatureGenerator
+- FeatureRegistry
+- IndexMetadata
+- FeatureStackResult
+- FeatureStackAssembler
+- Configuration-driven feature selection
+- NDWI
+- MNDWI
+- AWEI_sh
+- AWEI_nsh
+- NDVI
+- SAVI
+- BSI
+- NDMI
+- NDBI
+- Immutable feature metadata
+- Server-side feature generation
+
+Architecture Decisions:
+
+- Registry-based index management
+- Immutable FeatureStackResult
+- Configurable feature selection
+- Harmonized band schema only
+- Server-side Earth Engine computation
+- No getInfo() during feature generation
+
+## Module 7 - GeoTIFF Export & Dataset Generation
+
 

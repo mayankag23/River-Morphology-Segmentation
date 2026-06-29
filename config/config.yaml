@@ -604,3 +604,20 @@ logging:
   error_log_filename: "river_morphology_errors.log"
 
 #----------------------------------------------------------------------------------
+features:
+  # Water indices (primary discriminators for river morphology)
+  ndwi:             true    # McFeeters 1996: open water detection
+  mndwi:            true    # Xu 2006: primary water/sand separator
+  awei_sh:          true    # Feyisa 2014: shadow-affected water channels
+  awei_nsh:         true    # Feyisa 2014: non-shadowed water bodies
+  # Vegetation
+  ndvi:             true    # Rouse 1973: riparian vegetation suppressor
+  savi:             true    # Huete 1988: soil-adjusted vegetation
+  # Bare soil / exposed sediment
+  bsi:              true    # Rikimaru 2002: sandbar and bare soil detector
+  # Moisture
+  ndmi:             true    # Gao 1996: surface moisture
+  # Optional
+  ndbi:             false   # Zha 2003: built-up area indicator
+  # SAVI soil correction factor. 0.5 is recommended for most conditions.
+  savi_soil_factor: 0.5
