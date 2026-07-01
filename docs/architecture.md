@@ -102,3 +102,40 @@ Output layout:
         {scene_id}/
             image.tif
             metadata.json
+
+## Module 8
+PatchGenerator                  (generator.py)   <-- orchestrator only
+    |
+    +-- PatchTiler.compute_windows()        (tiler.py)     <-- pure index arithmetic
+    |
+    +-- PatchReader.read_window()           (reader.py)    <-- rasterio window read
+    |
+    +-- PatchValidator.validate()           (validator.py) <-- NoData ratio check
+    |
+    +-- GeoTiffWriter.write()               (REUSED from src.export.geotiff, Module 7)
+    |
+    +-- PatchManifestManager.add_entry()/save()  (manifest.py)
+    |
+    v
+PatchDatasetResult               <-- typed output contract
+
+## Module 9
+LabelSource (abstract)                    (source.py)
+    |
+    +-- FilesystemLabelSource              <-- discovers masks on disk
+    |   (future: SamAnnotationLabelSource, GisLabelSource, etc.
+    |    plug in without changing LabelManager)
+    v
+LabelManager.generate()                    (manager.py)   <-- orchestrator only
+    |
+    +-- ClassSchema.from_config()          (schema.py)
+    +-- SeasonResolver.from_config()       (temporal.py)
+    +-- HydrologicalYearResolver.from_config() (temporal.py)
+    +-- TemporalMetadataBuilder.build()    (temporal.py)
+    +-- LabelSource.discover()             (source.py)
+    +-- LabelValidator.validate()          (validator.py)
+    +-- LabelStatisticsCalculator          (statistics.py)
+    +-- LabelManifestManager               (manifest.py)
+    |
+    v
+LabelDatasetResult                          <-- typed output contract

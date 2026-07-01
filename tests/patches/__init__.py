@@ -1,0 +1,1 @@
+"""Unit tests for the src/patches Patch Generation pipeline (Module 8)."""

@@ -304,23 +304,24 @@ patch_generation:
 # Class Definitions
 # ------------------------------------------------------------------------------
 classes:
-  num_classes: 3
+  num_classes: 4 
 
   # Integer label assigned to each class in mask arrays and model output.
   labels:
     background: 0
     water:      1
     sand:       2
+    vegetation: 3
 
   # Ordered list where index = label integer value.
-  names: ["background", "water", "sand"]
+  names: ["background", "water", "sand", "vegetation"]
 
   # RGB display colors for visualization overlays.
   colors:
     background: [128, 128, 128]    # Gray
     water:      [0,   119, 190]    # Blue
     sand:       [255, 200,  87]    # Yellow
-
+    vegetation: [34,  139, 34]      # Green
 
 # ------------------------------------------------------------------------------
 # Model Configuration
@@ -618,3 +619,37 @@ logging:
   error_log_filename: "river_morphology_errors.log"
 
 #----------------------------------------------------------------------------------
+
+labels:
+  nodata_value:               255
+  mask_filename_pattern:      "{patch_id}_mask.tif"
+  default_label_version:      "1.0.0"
+  default_annotator:          "auto_generated"
+  default_confidence:         1.0
+  default_confidence_source:  "automatic"   # manual | automatic | reviewed
+  min_distinct_classes:       1
+  reject_single_class_masks:  false
+  max_nodata_ratio:           0.5
+  output_formats:             ["csv", "json"]
+  # Configurable class-pair ratios for statistics. Names must match
+  # configured class names; ratios are computed only when both classes
+  # exist in the schema.
+  ratios:
+    water_sand_ratio:      [water, sand]
+    vegetation_sand_ratio: [vegetation, sand]
+  # Bare-sediment fraction: numerator-class pixels / denominator-class pixels.
+  bare_sediment_numerator:   [sand]
+  bare_sediment_denominator: [water, sand, vegetation]
+
+temporal:
+  # Season boundaries — entirely configuration-driven, no hardcoded months
+  # anywhere in src/labels/.
+  seasons:
+    pre_monsoon:  [3, 4, 5]
+    monsoon:      [6, 7, 8, 9]
+    post_monsoon: [10, 11]
+    winter:       [12, 1, 2]
+  # Hydrological year start month [1-12]. A value of 6 means the
+  # hydrological year runs June(Y) through May(Y+1), grouped under year Y.
+  # Default 1 makes hydrological_year == calendar year (backward compatible).
+  hydrological_year_start_month: 6
