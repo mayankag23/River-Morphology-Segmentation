@@ -407,3 +407,79 @@ tests/labels/
 │── test_label_metadata.py
 │── test_label_schema.py
 │── test_label_validator.py
+
+## Module 10 - Dataset Assembly & Quality Control Pipeline
+
+Status: APPROVED
+
+Completion Date: 3 july, 2026
+
+Test Status: All tests passed
+Coverage: >90% (Overall Project Coverage: 92%)
+
+Features Implemented:
+
+- DatasetAssembler
+- DatasetSplitter
+- DatasetValidator
+- DatasetQualityAnalyzer
+- DatasetStatisticsCalculator
+- DatasetManifestManager
+- DatasetVersionManager
+- DataLeakageDetector
+- Random Dataset Splitting
+- Temporal Dataset Splitting
+- Spatial Dataset Splitting
+- Scene-level Split Management
+- Data Leakage Detection
+- Dataset Validation
+- Dataset Quality Analysis
+- Class Distribution Statistics
+- Seasonal Statistics
+- Yearly Statistics
+- Water/Sand Ratio Calculation
+- Vegetation/Sand Ratio Calculation
+- Bare Sediment Statistics
+- Dataset Manifest Generation
+- Train / Validation / Test Manifest Generation
+- Dataset Version Metadata
+- Deterministic Dataset Generation
+- Random Seed Support
+- End-to-end Dataset Assembly Pipeline
+
+Architecture Decisions:
+
+- DatasetAssembler is the only public dataset assembly interface.
+- Scene-level splitting prevents train/validation/test leakage.
+- Supports Random, Temporal and Spatial split strategies.
+- Validation performed before dataset assembly.
+- Dataset quality analysis separated from validation logic.
+- Statistics generation is modular and independent.
+- Manifest generation separated from dataset assembly.
+- Dataset versioning provides reproducibility.
+- Fully configuration-driven dataset generation.
+- Compatible with previous Patch Generation and Label Management modules.
+- Ready for future PyTorch Dataset and DataLoader integration.
+- No hardcoded dataset paths.
+- Production-ready machine learning dataset preparation pipeline.
+
+src/dataset/
+│── __init__.py
+│── assembler.py
+│── leakage.py
+│── manifest.py
+│── quality.py
+│── splitter.py
+│── statistics.py
+│── validator.py
+│── version.py
+
+tests/dataset/
+│── test_dataset_assembler.py
+│── test_dataset_leakage.py
+│── test_dataset_manifest.py
+│── test_dataset_quality.py
+│── test_dataset_splitter.py
+│── test_dataset_statistics.py
+│── test_dataset_validator.py
+│── test_dataset_version.py

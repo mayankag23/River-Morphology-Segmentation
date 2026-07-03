@@ -89,12 +89,16 @@ gee:
 # The system raises an error if only some coordinates are set (partial config).
 # Leave all four as null if you will provide coordinates programmatically.
 # ------------------------------------------------------------------------------
+# aoi:
+#   min_lon: null    # Western boundary (longitude), e.g. 87.0
+#   min_lat: null    # Southern boundary (latitude),  e.g. 26.0
+#   max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
+#   max_lat: null    # Northern boundary (latitude),  e.g. 26.5
 aoi:
-  min_lon: null    # Western boundary (longitude), e.g. 87.0
-  min_lat: null    # Southern boundary (latitude),  e.g. 26.0
-  max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
-  max_lat: null    # Northern boundary (latitude),  e.g. 26.5
-
+  min_lon: 91.55
+  min_lat: 26.18
+  max_lon: 91.75
+  max_lat: 26.38
   # Safety limit: AOIs wider than this may span multiple UTM zones, causing
   # spatial distortion in downloaded imagery. A warning is raised if exceeded.
   max_width_degrees: 3.0
@@ -282,11 +286,11 @@ label_generation:
 patch_generation:
   # Spatial size of each patch in pixels. Must be a power of 2.
   # 512 fits on a T4 (16 GB) GPU at batch_size=8 with 11 input channels.
-  patch_size: 512
+  patch_size: 256 #512
 
   # Stride for training patch extraction.
   # 256 = 50% overlap → generates ~4× more patches than non-overlapping.
-  train_stride: 256
+  train_stride: 128 #256
 
   # Stride for inference patch extraction.
   # 50% overlap enables Gaussian-weighted blending to remove boundary artifacts.
@@ -343,7 +347,7 @@ model:
   encoder_name:    "efficientnet-b4"
   encoder_weights: "imagenet"       # Pretrain from ImageNet; never train from scratch
   in_channels:     11               # Must equal num_channels
-  num_classes:     3                # Must equal classes.num_classes
+  num_classes:     4                # Must equal classes.num_classes
 
   # U-Net++ decoder channel sizes from coarse (deepest) to fine (shallowest) scale.
   # Ignored by architectures with fixed decoders (PSPNet, DeepLabV3Plus).
@@ -487,16 +491,53 @@ training:
   tensorboard:
     enabled:           true
     log_every_n_steps: 10
+  
+# Normalization
+  normalization:
+    strategy:       "per_band_mean_std"   # per_band_mean_std | min_max | none
+    percentile_min: 2                      # for min_max strategy
+    percentile_max: 98
+   
+# Augmentation (applied to training split only)
+  augmentation:
+    enabled:           true
+    horizontal_flip:   true
+    vertical_flip:     true
+    random_rotate_90:  true
+    random_brightness_contrast: true
+    brightness_limit:  0.15
+    contrast_limit:    0.15
+
+# DataLoader
+  dataloader:
+    batch_size:        8
+    num_workers:       4
+    pin_memory:        true
+    prefetch_factor:   2
+    persistent_workers: true
+    train_shuffle:     true
+
+  # Sampling
+  sampler:
+    strategy:      "none"   # none | temporal_balanced | class_balanced
+    random_seed:   42
+
+  # Class weights for loss function
+  class_weights:
+    strategy:     "inverse_frequency"   # none | inverse_frequency | manual
+    manual_weights: []   # only used when strategy = manual
+
 
   # [train_ratio, val_ratio, test_ratio] — must sum to 1.0
   train_val_test_split: [0.70, 0.15, 0.15]
+
 
 
 # ------------------------------------------------------------------------------
 # Inference Configuration
 # ------------------------------------------------------------------------------
 inference:
-  patch_size:  512    # Must match patch_generation.patch_size
+  patch_size:  256 #512    # Must match patch_generation.patch_size
   stride:      256    # 50% overlap enables Gaussian-weighted tile blending
 
   # Sigma for Gaussian weight map used in tile blending.
@@ -577,7 +618,7 @@ export:
 
   # Maximum pixels per download tile (width * height).
   # 1 M pixels at 11 bands float32 ~ 44 MB uncompressed, within GEE limits.
-  max_tile_pixels: 1000000
+  max_tile_pixels: 250000 #1000000
   dataset_version:        "1.0.0"
   pipeline_version:       "1.0.0"
   feature_schema_version: "1.0.0"
@@ -653,3 +694,18 @@ temporal:
   # hydrological year runs June(Y) through May(Y+1), grouped under year Y.
   # Default 1 makes hydrological_year == calendar year (backward compatible).
   hydrological_year_start_month: 6
+
+dataset:
+  split:
+    strategy:     "temporal"   # random | temporal | spatial
+    train_ratio:   0.70
+    val_ratio:     0.15
+    test_ratio:    0.15
+    random_seed:   42
+  quality:
+    min_valid_pixel_ratio:  0.5
+    min_samples_per_split:  5
+    min_total_samples:      10
+    reject_corrupted:       true
+  output_formats: ["csv", "json"]
+  dataset_version: "1.0.0"

@@ -275,9 +275,10 @@ class BandHarmonizer:
             spacecraft = ee.String(image.get("SPACECRAFT_ID"))
 
             # Build is_oli condition: SPACECRAFT_ID is LANDSAT_8 or LANDSAT_9.
-            is_l8  = spacecraft.equals(oli_ids[0])
-            is_l9  = spacecraft.equals(oli_ids[1])
-            is_oli = is_l8.Or(is_l9)
+            # is_l8  = spacecraft.equals(oli_ids[0])
+            # is_l9  = spacecraft.equals(oli_ids[1])
+            # is_oli = is_l8.Or(is_l9)
+            is_oli = ee.List(oli_ids).contains(spacecraft)
 
             # Two possible outcomes evaluated lazily server-side.
             oli_renamed = (

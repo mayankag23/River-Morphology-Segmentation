@@ -139,3 +139,45 @@ LabelManager.generate()                    (manager.py)   <-- orchestrator only
     |
     v
 LabelDatasetResult                          <-- typed output contract
+
+## Module 10
+DatasetAssembler              (assembler.py)    <-- orchestrator only
+    |
+    +-- DatasetValidator           (validator.py)   -- QC checks
+    +-- DatasetSplitter            (splitter.py)    -- train/val/test split
+    +-- DataLeakageDetector        (leakage.py)     -- leakage prevention
+    +-- DatasetStatisticsCalculator (statistics.py) -- class distribution
+    +-- DatasetQualityAnalyzer     (quality.py)     -- quality report
+    +-- DatasetManifestManager     (manifest.py)    -- all file outputs
+    +-- DatasetVersionManager      (version.py)     -- version.json
+    |
+    v
+TrainingDatasetResult           <-- frozen typed output contract
+
+# Module 11
+DataLoaderFactory                 (dataloader.py)  <-- orchestrator only
+    |
+    +-- DatasetNormalizer              (normalizer.py)
+    |       +-- compute(train_samples) -> NormalizationStats
+    |       +-- apply(data)            -> normalized tensor
+    |
+    +-- AugmentationPipeline           (transforms.py)
+    |       +-- build_train_transform() -> albumentations.Compose
+    |       +-- build_eval_transform()  -> albumentations.Compose
+    |
+    +-- RiverMorphologyDataset         (dataset.py)
+    |       +-- __getitem__() reads patch.tif + mask.tif via rasterio
+    |       +-- returns (image_tensor, mask_tensor, SampleMetadata)
+    |
+    +-- TemporalSampler                (sampler.py)  (optional)
+    |       +-- WeightedRandomSampler by season/year
+    |
+    v
+DataLoaderBundle                       <-- typed output
+    +-- train_loader  (DataLoader)
+    +-- val_loader    (DataLoader)
+    +-- test_loader   (DataLoader)
+    +-- norm_stats    (NormalizationStats)
+    +-- class_weights (ClassWeights)
+
+# Module 12
