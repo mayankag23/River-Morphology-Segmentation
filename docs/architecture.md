@@ -120,7 +120,27 @@ PatchGenerator                  (generator.py)   <-- orchestrator only
 PatchDatasetResult               <-- typed output contract
 
 ## Module 9
-LabelSource (abstract)                    (source.py)
+PatchDatasetResult + SceneMetadata
+        │
+        ▼
+LabelManager.generate()          <-- orchestrator only (updated)
+        │
+        ├── SpectralBandReader   (classifier.py)  reads patch GeoTIFF
+        ├── RuleEngine           (rules.py)        applies spectral rules
+        ├── ConflictResolver     (conflicts.py)    resolves class conflicts
+        ├── MorphologyProcessor  (morphology.py)   cleans mask geometry
+        ├── QualityAssessment    (quality.py)      scores mask quality
+        ├── ConfidenceEstimator  (confidence.py)   pixel/mask confidence
+        ├── PseudoLabelGenerator (generator.py)    orchestrates + saves mask
+        ├── LabelValidator       (validator.py)    REUSED unchanged
+        ├── LabelStatisticsCalculator (statistics.py) REUSED unchanged
+        ├── TemporalMetadataBuilder   (temporal.py)   REUSED unchanged
+        └── LabelManifestManager  (manifest.py)    REUSED unchanged
+        │
+        ▼
+LabelDatasetResult               <-- identical public contract
+
+<!-- LabelSource (abstract)                    (source.py)
     |
     +-- FilesystemLabelSource              <-- discovers masks on disk
     |   (future: SamAnnotationLabelSource, GisLabelSource, etc.
@@ -138,8 +158,60 @@ LabelManager.generate()                    (manager.py)   <-- orchestrator only
     +-- LabelManifestManager               (manifest.py)
     |
     v
-LabelDatasetResult                          <-- typed output contract
+LabelDatasetResult                          <-- typed output contract -->
 
+###############################################################################################
+PatchDatasetResult + SceneMetadata (+ optional ClassificationContext)
+        │
+        ▼
+LabelManager.generate()                              (manager.py — UNCHANGED)
+        │
+        ▼
+PseudoLabelGenerator.generate(context=None)          (generator.py — updated)
+        │
+        ├── SpectralClassificationEngine
+        │       .classify(patch_path, context=None)  (classifier.py — updated)
+        │           │
+        │           └── RuleRegistry                 (rules.py — NEW)
+        │                   └── registered rules (discovered automatically)
+        │                       WaterRule   (evidence-based sigmoid scoring)
+        │                       VegetationRule  (evidence-based sigmoid scoring)
+        │                       SandRule    (extended: +NDBI,NDMI,SAVI)
+        │                       BackgroundRule  (fallback)
+        │                       [Future: ShadowRule, MudRule, SnowRule ...]
+        │
+        ├── ConflictResolver.resolve()                (conflicts.py — UNCHANGED)
+        │
+        ├── MorphologyProcessor.process()             (morphology.py — updated)
+        │       New order:
+        │       Opening → Small-object removal → Closing
+        │       → Hole filling → Boundary smoothing (channel-preserving)
+        │
+        ├── QualityAssessment.assess()                (quality.py — updated)
+        │       Pluggable QualityMetric list:
+        │       ValidPixelRatioMetric      (core, weight=0.50)
+        │       UnclassifiedRatioMetric    (core, weight=0.30)
+        │       ClassCoverageMetric        (core, weight=0.20)
+        │       WaterContinuityMetric      (optional, river-specific)
+        │       FragmentationMetric        (optional, river-specific)
+        │       [Future metrics plug in without changing QualityAssessment]
+        │
+        ├── ConfidenceEstimator.estimate(             (confidence.py — updated)
+        │       classification, class_map,
+        │       quality_result=None)
+        │       Pluggable ConfidenceComponent list:
+        │       SpectralEvidenceComponent   (weight from config)
+        │       RuleAgreementComponent      (weight from config)
+        │       NeighborhoodConsistencyComponent (weight from config)
+        │       QualityWeightComponent      (weight from config)
+        │       [Future components plug in]
+        │
+        ├── ReproducibilityMetadata (generated)      (contracts.py — NEW class)
+        │
+        └── PseudoLabelResult (+ reproducibility)    (contracts.py — updated)
+
+        ▼
+LabelDatasetResult                                   (public contract — UNCHANGED)
 ## Module 10
 DatasetAssembler              (assembler.py)    <-- orchestrator only
     |

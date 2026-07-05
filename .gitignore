@@ -11,3 +11,17 @@ __pycache__/
 
 # Environment variables
 .env
+
+# Test coverage
+.coverage
+
+# Demo outputs
+outputs/demo_dataset/
+outputs/demo_patches/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Raster auxiliary files
+*.aux.xml
