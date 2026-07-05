@@ -511,7 +511,7 @@ tests/dataset/
 │── test_dataset_validator.py
 │── test_dataset_version.py
 
-# Module 11 - PyTorch Dataset & DataLoader Pipeline
+## Module 11 - PyTorch Dataset & DataLoader Pipeline
 
 Status: APPROVED
 Completion Date: 3 July, 2026
@@ -651,3 +651,235 @@ tests/training/
 │── test_training_statistics.py
 │── test_training_transform.py
 │── test_training_validator.py
+
+## Module 13 - Segmentation Model Framework
+
+Status: APPROVED
+
+Completion Date: 5 July, 2026
+
+Test Status: All tests passed
+Coverage: >90% (Overall Project Coverage: 95%)
+
+Features Implemented:
+
+- BaseSegmentationModel
+- ModelFactory
+- ModelRegistry
+- ModelResult
+- ModelConfig
+- UNet++
+- UNetEncoder
+- UNetPlusPlusDecoder
+- SegmentationHead
+- DecoderBlock
+- ConvolutionBlock
+- Deep Supervision Support
+- Configurable Encoder Filters
+- Configurable Decoder Filters
+- Configurable Input Channels
+- Configurable Number of Classes
+- Configurable Activation
+- Configurable Normalization
+- Configurable Dropout
+- Configurable Weight Initialization
+- Deterministic Model Initialization
+- Multi-spectral Image Support
+- Arbitrary Image Size Support
+- Production-ready Model Framework
+
+Architecture Decisions:
+
+- ModelFactory is the only public model creation interface.
+- ModelRegistry manages all available segmentation models.
+- BaseSegmentationModel defines the common model interface.
+- UNet++ is the first registered segmentation model.
+- Supports arbitrary multi-spectral input channels.
+- Supports configurable number of segmentation classes.
+- Deep supervision is configuration-driven.
+- Weight initialization is deterministic through Config.
+- Forward pass returns logits only.
+- No activation functions are applied inside the model.
+- No optimizer, scheduler or loss logic inside Module 13.
+- Compatible with Modules 11 and 12.
+- Production-ready segmentation model architecture.
+
+src/training/models/
+│── __init__.py
+│── base.py
+│── blocks.py
+│── contracts.py
+│── decoder.py
+│── encoder.py
+│── factory.py
+│── heads.py
+│── registry.py
+│── unetplusplus.py
+
+tests/training/models/
+│── test_base.py
+│── test_blocks.py
+│── test_decoder.py
+│── test_encoder.py
+│── test_factory.py
+│── test_heads.py
+│── test_registry.py
+│── test_unetplusplus.py
+
+## Module 14 - Training Engine Framework
+
+Status: APPROVED
+
+Completion Date: 5 July, 2026
+
+Test Status: All tests passed
+Coverage: >90% (Overall Project Coverage: 95%)
+
+Features Implemented:
+
+- TrainingEngine
+- Trainer
+- TrainingResult
+- TrainingConfig
+- Callback Framework
+- CallbackFactory
+- CheckpointManager
+- OptimizerFactory
+- SchedulerFactory
+- LossFactory
+- CrossEntropyLoss
+- DiceLoss
+- FocalLoss
+- CombinedLoss
+- TrainingHistory
+- TrainingLogger
+- SeedManager
+- Mixed Precision Training
+- Automatic FP32 Fallback
+- Gradient Clipping
+- Early Stopping Support
+- Resume Training
+- Checkpoint Versioning
+- Deterministic Training
+- Configuration-driven Training Pipeline
+
+Architecture Decisions:
+
+- TrainingEngine is the only public training interface.
+- Optimizers, schedulers and losses are factory-driven.
+- Callback architecture is fully extensible.
+- Checkpoints store complete training state.
+- Mixed precision automatically falls back to FP32.
+- Deterministic training through centralized seed management.
+- Loss implementations are independent of training logic.
+- Optimizer and scheduler configuration comes entirely from Config.
+- Training loop separated from model architecture.
+- Compatible with Module 13 model framework.
+- Production-ready deep learning training engine.
+
+src/training/engine/
+│── __init__.py
+│── callbacks.py
+│── checkpoint.py
+│── contracts.py
+│── engine.py
+│── factory.py
+│── history.py
+│── logger.py
+│── losses.py
+│── optimizer.py
+│── scheduler.py
+│── seed.py
+│── trainer.py
+│── validator.py
+
+tests/training/engine/
+│── test_callbacks.py
+│── test_checkpoint.py
+│── test_engine.py
+│── test_factory.py
+│── test_history.py
+│── test_logger.py
+│── test_losses.py
+│── test_optimizer.py
+│── test_scheduler.py
+│── test_seed.py
+│── test_trainer.py
+│── test_validator.py
+
+## Module 15 - Model Evaluation Framework
+
+Status: APPROVED
+
+Completion Date: 6 July, 2026
+
+Test Status: All tests passed
+Coverage: >90% (Overall Project Coverage: 95%)
+
+Features Implemented:
+
+- EvaluationEngine
+- EvaluationFactory
+- EvaluationResult
+- EvaluationConfig
+- Evaluator
+- EvaluationReporter
+- EvaluationValidator
+- MetricRegistry
+- ConfusionMatrixAccumulator
+- PredictionStatisticsAccumulator
+- ClassMetrics
+- ConfusionMatrix
+- PredictionStatistics
+- Pixel Accuracy
+- Mean Pixel Accuracy
+- Precision
+- Recall
+- F1 Score
+- Dice Score
+- IoU
+- Mean IoU
+- Frequency Weighted IoU
+- Cohen's Kappa
+- Balanced Accuracy
+- Multi-class Confusion Matrix
+- Ignore Index Support
+- JSON Report Generation
+- CSV Report Generation
+- Streaming Evaluation Pipeline
+- Vectorized Metric Computation
+
+Architecture Decisions:
+
+- EvaluationEngine is the only public evaluation interface.
+- Confusion matrix is the single source of truth for all metrics.
+- MetricRegistry manages all evaluation metrics.
+- Metrics are computed using vectorized NumPy operations.
+- Ignore index is excluded before confusion matrix accumulation.
+- Evaluation is completely independent of training.
+- Prediction statistics are derived from the confusion matrix.
+- JSON and CSV reporting are separated from evaluation logic.
+- Supports arbitrary numbers of segmentation classes.
+- Configuration-driven evaluation pipeline.
+- Compatible with Module 14 TrainingResult.
+- Production-ready evaluation framework.
+
+src/training/evaluation/
+│── __init__.py
+│── confusion.py
+│── contracts.py
+│── engine.py
+│── evaluator.py
+│── factory.py
+│── metrics.py
+│── reporter.py
+│── statistics.py
+│── validator.py
+
+tests/training/evaluation/
+│── test_eval_confusion.py
+│── test_eval_contracts.py
+│── test_eval_evaluator_engine.py
+│── test_eval_metrics.py
+│── test_eval_statistics_validator_reporter.py
+

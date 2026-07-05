@@ -185,187 +185,91 @@ __all__ = [
     "TransformPipeline",
 ]
 
+# ==============================================================================
+# MODULE 13 EXPORTS -- Segmentation Model Framework
+# All imports below are additive. No Module 11/12 symbol is removed or redefined.
+# ==============================================================================
 
+from src.training.models import (
+    # Contracts
+    EncoderConfig,
+    DecoderConfig,
+    ModelConfig,
+    ModelResult,
+    # Abstract base
+    SegmentationModel,
+    # Registry + Factory
+    ModelRegistry,
+    ModelFactory,
+    # Shared blocks
+    ConvBnAct,
+    DoubleConv,
+    ResidualBlock,
+    build_norm,
+    build_act,
+    # Sub-components
+    UNetEncoder,
+    EncoderOutput,
+    UNetPlusPlusDecoder,
+    SegmentationHead,
+    # Concrete models
+    UNetPlusPlus,
+)
 
-# """
-# src/training package -- Modules 11 and 12.
+_MODULE_13_SYMBOLS: list[str] = [
+    "EncoderConfig",
+    "DecoderConfig",
+    "ModelConfig",
+    "ModelResult",
+    "SegmentationModel",
+    "ModelRegistry",
+    "ModelFactory",
+    "ConvBnAct",
+    "DoubleConv",
+    "ResidualBlock",
+    "build_norm",
+    "build_act",
+    "UNetEncoder",
+    "EncoderOutput",
+    "UNetPlusPlusDecoder",
+    "SegmentationHead",
+    "UNetPlusPlus",
+]
 
-# Module 11 -- PyTorch Dataset & DataLoader (FROZEN)
-#     Provides: TorchDatasetResult, RiverMorphologyDataset, and DataLoader utilities.
-#     These exports must NOT be removed or modified.
+# ==============================================================================
+# MODULE 14 EXPORTS -- Training Engine Framework
+# All imports below are additive. No Module 11/12/13 symbol is removed or redefined.
+# ==============================================================================
 
-# Module 12 -- Data Transformation & Augmentation Pipeline
-#     Provides: TransformPipeline, AugmentedDataset, TransformPipelineResult,
-#               and all transform / augmentation / normalization / registry classes.
-
-# When integrating this file into the repository, preserve all existing Module 11
-# imports and exports exactly as they appear in the current __init__.py.
-# The Module 12 section below is purely additive.
-# """
-
-# # ==============================================================================
-# # MODULE 11 EXPORTS -- FROZEN -- DO NOT MODIFY
-# # Copy the existing Module 11 __init__.py content here exactly.
-# # The imports below are placeholders; replace with the actual Module 11 exports.
-# # ==============================================================================
-
-# # Example (replace with the real Module 11 imports):
-# #   from src.training.dataset import RiverMorphologyDataset, TorchDatasetResult
-# #   from src.training.dataloader import DataLoaderFactory, DataLoaderConfig
-# #
-# # IMPORTANT: Do not remove or rename any Module 11 symbol.
-# # Modules 10 and the rest of the pipeline depend on TorchDatasetResult
-# # being importable from src.training.
-
-# # ==============================================================================
-# # MODULE 12 EXPORTS -- Data Transformation & Augmentation Pipeline
-# # All imports below are additive. They do not replace any Module 11 export.
-# # ==============================================================================
-
-# # Contracts (public API consumed by Modules 13 and 14)
-# from src.training.contracts import (
-#     NormalizationStatistics,
-#     TransformMetadata,
-#     TransformPipelineResult,
-#     TransformSample,
-# )
-
-# # Core transform interface
-# from src.training.transform import (
-#     ComposedTransform,
-#     IdentityTransform,
-#     SegmentationTransform,
-# )
-
-# # Augmentation transforms
-# from src.training.augmentation import (
-#     BrightnessTransform,
-#     ContrastTransform,
-#     GaussianNoiseTransform,
-#     HorizontalFlipTransform,
-#     RandomCropTransform,
-#     RandomScaleTransform,
-#     Rotate90Transform,
-#     VerticalFlipTransform,
-# )
-
-# # Normalization
-# from src.training.normalization import NormalizationTransform
-
-# # Statistics computation
-# from src.training.statistics import DatasetStatisticsAccumulator
-
-# # Validation
-# from src.training.validator import TransformValidationResult, TransformValidator
-
-# # Registry
-# from src.training.registry import TransformRegistry
-
-# # Pipeline (public entry point for Module 12)
-# from src.training.pipeline import AugmentedDataset, TransformPipeline
-
-# # ==============================================================================
-# # __all__
-# # This list must include both Module 11 symbols AND Module 12 symbols.
-# # Add Module 11 symbol names to the MODULE_11_SYMBOLS list below.
-# # ==============================================================================
-
-# _MODULE_11_SYMBOLS: list[str] = [
-#     # Replace this list with the actual Module 11 public symbol names.
-#     # Example:
-#     #   "TorchDatasetResult",
-#     #   "RiverMorphologyDataset",
-#     #   "DataLoaderFactory",
-# ]
-
-# _MODULE_12_SYMBOLS: list[str] = [
-#     # Contracts
-#     "NormalizationStatistics",
-#     "TransformSample",
-#     "TransformMetadata",
-#     "TransformPipelineResult",
-#     # Interface
-#     "SegmentationTransform",
-#     "ComposedTransform",
-#     "IdentityTransform",
-#     # Augmentations
-#     "HorizontalFlipTransform",
-#     "VerticalFlipTransform",
-#     "Rotate90Transform",
-#     "BrightnessTransform",
-#     "ContrastTransform",
-#     "GaussianNoiseTransform",
-#     "RandomCropTransform",
-#     "RandomScaleTransform",
-#     # Normalization
-#     "NormalizationTransform",
-#     # Statistics
-#     "DatasetStatisticsAccumulator",
-#     # Validation
-#     "TransformValidator",
-#     "TransformValidationResult",
-#     # Registry
-#     "TransformRegistry",
-#     # Pipeline
-#     "TransformPipeline",
-#     "AugmentedDataset",
-# ]
-
-
-# # """
-# # PyTorch Dataset & DataLoader pipeline for the River Morphology Segmentation
-# # System (Module 11).
-
-# # Bridges the assembled dataset (Module 10's TrainingDatasetResult) to the
-# # deep-learning training loop.
-
-# # Input:   TrainingDatasetResult (Module 10)
-# # Output:  DataLoaderBundle (immutable)
-
-# # Transform architecture:
-# #     Transform (ABC)         -- interface: __call__(image, mask) -> (image, mask)
-# #     IdentityTransform       -- no-op default (eval splits, tests)
-# #     AlbumentationsTransform -- wraps albumentations.Compose; all albumentations
-# #                                coupling is confined to this class; Module 12
-# #                                may inject any other Transform subclass
-# # """
-
-# # from src.training.dataloader import DataLoaderBundle, DataLoaderConfig, DataLoaderFactory
-# # from src.training.dataset import RiverMorphologyDataset, RiverMorphologySample, SampleMetadata
-# # from src.training.normalizer import DatasetNormalizer, NormalizationStats, NormalizationStrategy
-# # from src.training.sampler import TemporalSampler
-# # from src.training.transforms import (
-# #     AlbumentationsTransform,
-# #     AugmentationConfig,
-# #     AugmentationPipeline,
-# #     IdentityTransform,
-# #     Transform,
-# # )
-# # from src.training.weights import ClassWeights, ClassWeightStrategy
-
-# # __all__ = [
-# #     # Transform interface
-# #     "Transform",
-# #     "IdentityTransform",
-# #     "AlbumentationsTransform",
-# #     # Dataset
-# #     "SampleMetadata",
-# #     "RiverMorphologySample",
-# #     "RiverMorphologyDataset",
-# #     # Normalization
-# #     "NormalizationStrategy",
-# #     "NormalizationStats",
-# #     "DatasetNormalizer",
-# #     # Augmentation config (kept for backward compatibility)
-# #     "AugmentationConfig",
-# #     "AugmentationPipeline",
-# #     # Sampling
-# #     "TemporalSampler",
-# #     # Class weights
-# #     "ClassWeightStrategy",
-# #     "ClassWeights",
-# #     # DataLoader
-# #     "DataLoaderConfig",
-# #     "DataLoaderBundle",
-# #     "DataLoaderFactory",
-# # ]
+from src.training.engine import (
+    # Primary
+    TrainingEngine,
+    # Contracts
+    TrainingConfig,
+    OptimizerConfig,
+    SchedulerConfig,
+    LossConfig,
+    CheckpointConfig,
+    EpochResult,
+    TrainingResult,
+    # Losses
+    LossRegistry,
+    CrossEntropyLoss,
+    DiceLoss,
+    FocalLoss,
+    CombinedLoss,
+    # Optimizer / scheduler
+    OptimizerFactory,
+    SchedulerFactory,
+    # Callbacks
+    Callback,
+    CallbackList,
+    CheckpointCallback,
+    LoggingCallback,
+    EarlyStoppingCallback,
+    # Support
+    CheckpointManager,
+    SeedManager,
+    TrainingValidator,
+    TrainingHistory,
+)
