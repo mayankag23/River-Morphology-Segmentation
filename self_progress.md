@@ -1001,5 +1001,106 @@ No public APIs changed.
 
 No production behavior changed.
 
+## Module 17 - River Morphology Analytics Framework
+
+Status: APPROVED
+
+Completion Date: 6 July, 2026
+
+Test Status: All tests passed
+Coverage: >90% (Overall Project Coverage: 95%)
+
+Features Implemented:
+
+- MorphologyEngine
+- MorphologyAnalyzer
+- MorphologyFactory
+- MorphologyValidator
+- RiverMorphologyResult
+- AnalyticsConfig
+- ClassMorphologyMetrics
+- GeometryMetrics
+- ConnectedRegionStats
+- ClassRegionMetrics
+- TemporalAnalyzer
+- GeometryAnalyzer
+- MorphologyStatisticsComputer
+- UncertaintyAnalyzer
+- Water Area Calculation
+- Sand Area Calculation
+- Vegetation Area Calculation
+- Background Area Calculation
+- Confidence-weighted Area Calculation
+- Connected Region Analysis
+- Region Fragmentation Statistics
+- Largest Region Detection
+- Mean Region Size Calculation
+- Standard Deviation of Region Sizes
+- Estimated Region Width
+- Shape Descriptor Support
+- Perimeter Calculation
+- Compactness Calculation
+- Elongation Calculation
+- Aspect Ratio Calculation
+- Temporal Morphology Analysis
+- Seasonal Morphology Analysis
+- Hydrological Year Support
+- Confidence Statistics
+- AOI-level Aggregation
+- Reach-level Aggregation
+- River-level Aggregation
+- Basin-level Aggregation
+- Pixel Resolution Support
+- Multi-resolution Ready Architecture
+- Configuration-driven Morphology Pipeline
+
+Architecture Decisions:
+
+- MorphologyEngine is the only public morphology analysis interface.
+- MorphologyAnalyzer orchestrates all scientific analyses.
+- GeometryAnalyzer performs generic connected-region analysis.
+- ConnectedRegionStats provides reusable object-level descriptors.
+- ClassRegionMetrics aggregates statistics for each morphology class.
+- Confidence-weighted metrics directly consume Module 16 confidence maps.
+- Shape descriptors are optional and configuration-driven.
+- Pixel width and height are preserved for future multi-resolution satellite imagery.
+- Supports arbitrary segmentation classes from Config.
+- Temporal analysis is independent of geometry analysis.
+- Uncertainty analysis is independent of morphology computation.
+- Validation is separated from analytics logic.
+- Fully configuration-driven.
+- Compatible with Module 16 InferenceResult.
+- Production-ready river morphology analytics framework.
+
+Scientific Refinements:
+
+- Replaced boundary-pixel perimeter estimation with true 4-connected edge perimeter computation.
+- Compactness now follows the standard geometric definition:
+  Compactness = 4πA / P²
+- Square compactness correctly evaluates to approximately π/4 (≈0.785).
+- Generic connected-region analysis replaces domain-specific object assumptions.
+- Confidence-weighted morphology metrics added using Module 16 confidence maps.
+- Pixel resolution metadata preserved for future multi-resolution sensors.
+
+src/morphology/
+│── __init__.py
+│── analyzer.py
+│── contracts.py
+│── engine.py
+│── factory.py
+│── geometry.py
+│── statistics.py
+│── temporal.py
+│── uncertainty.py
+│── validator.py
+
+tests/morphology/
+│── test_morphology_contracts.py
+│── test_morphology_engine.py
+│── test_morphology_geometry.py
+│── test_morphology_statistics.py
+│── test_morphology_temporal.py
+│── test_morphology_uncertainty.py
+│── test_morphology_validator.py
 
 

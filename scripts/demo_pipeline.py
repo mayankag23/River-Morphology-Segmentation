@@ -315,3 +315,67 @@ print(SUBLINE)
 
 for line in patch_result.summary_lines():
     print(line)
+
+#################################################
+# ==========================================================
+# Module 9 - Pseudo Label Generation
+# ==========================================================
+
+from src.labels.generator import PseudoLabelGenerator
+from src.labels.renderer import DemoRenderer
+from src.labels.schema import ClassDefinition, ClassSchema
+
+section("Module 9 - Pseudo Label Generation")
+
+schema = ClassSchema(
+    classes=(
+        ClassDefinition(0, "background", (128, 128, 128)),
+        ClassDefinition(1, "water", (0, 119, 190)),
+        ClassDefinition(2, "sand", (255, 200, 87)),
+        ClassDefinition(3, "vegetation", (34, 139, 34)),
+    )
+)
+
+generator = PseudoLabelGenerator.from_config(
+    config,
+    schema,
+)
+
+mask_path = (
+    patch_result.patch_root
+    / "scenes"
+    / "demo_scene"
+    / "patches"
+    / "demo_scene_r000_c000_mask.tif"
+)
+
+patch_path = (
+    patch_result.patch_root
+    / "scenes"
+    / "demo_scene"
+    / "patches"
+    / "demo_scene_r000_c000.tif"
+)
+
+label_result = generator.generate(
+    patch_path=patch_path,
+    patch_id="demo_scene_r000_c000",
+    output_path=mask_path,
+)
+
+ok("Pseudo Labels Generated")
+
+print()
+
+for line in label_result.summary_lines():
+    print(line)
+
+# ==========================================================
+# Demo Visualization
+# ==========================================================
+
+section("Visualization")
+
+renderer = DemoRenderer(
+    output_dir=Path("outputs/demo_visualizations"),
+)
