@@ -341,34 +341,54 @@ generator = PseudoLabelGenerator.from_config(
     schema,
 )
 
-mask_path = (
-    patch_result.patch_root
-    / "scenes"
-    / "demo_scene"
-    / "patches"
-    / "demo_scene_r000_c000_mask.tif"
-)
+# patch_dir = patch_result.scene_patches_dir
 
-patch_path = (
-    patch_result.patch_root
-    / "scenes"
-    / "demo_scene"
-    / "patches"
-    / "demo_scene_r000_c000.tif"
-)
+# patch_path = patch_dir / "demo_scene_r000_c000.tif"
 
+# mask_path = patch_dir / "demo_scene_r000_c000_mask.tif"
+
+# label_result = generator.generate(
+#     patch_path=patch_path,
+#     patch_id="demo_scene_r000_c000",
+#     output_path=mask_path,
+# )
+
+
+patch_dir = patch_result.scene_patches_dir
+
+patch_files = sorted(patch_dir.glob("*.tif"))
+
+# Ignore mask files if they already exist
+patch_files = [p for p in patch_files if "_mask" not in p.stem]
+
+patch_path = patch_files[0]
+
+mask_path = patch_dir / f"{patch_path.stem}_mask.tif"
 label_result = generator.generate(
     patch_path=patch_path,
-    patch_id="demo_scene_r000_c000",
-    output_path=mask_path,
+    patch_id=patch_path.stem,
+    output_mask_path=mask_path,
 )
 
 ok("Pseudo Labels Generated")
 
 print()
 
-for line in label_result.summary_lines():
-    print(line)
+print("Patch ID              :", label_result.patch_id)
+print("Mask Path             :", label_result.mask_path)
+print("Mask Confidence       :", f"{label_result.mask_confidence:.3f}")
+print("Quality Score         :", f"{label_result.quality_score:.3f}")
+print("Acceptable            :", label_result.is_acceptable)
+print("Classes Present       :", label_result.num_classes_present)
+print("Valid Pixel Ratio     :", f"{label_result.valid_pixel_ratio:.2%}")
+print("Unclassified Ratio    :", f"{label_result.unclassified_ratio:.2%}")
+print("Spectral Indices Used :", ", ".join(label_result.spectral_indices_used))
+print("CRS                   :", label_result.crs)
+
+if label_result.issues:
+    print("Issues                :", ", ".join(label_result.issues))
+else:
+    print("Issues                : None")
 
 # ==========================================================
 # Demo Visualization
@@ -379,3 +399,37 @@ section("Visualization")
 renderer = DemoRenderer(
     output_dir=Path("outputs/demo_visualizations"),
 )
+
+# Generate only the visualizations that don't require a confidence map
+renderer.render_rgb(patch_path)
+
+renderer.render_pseudo_labels(mask_path)
+
+renderer.render_overlay(
+    image_path=patch_path,
+    mask_path=mask_path,
+)
+
+renderer.render_patch_gallery(
+    patch_directory=patch_result.scene_patches_dir,
+)
+
+print()
+
+ok("Visualizations Generated")
+
+print()
+
+print("Generated Visualizations")
+print(SUBLINE)
+
+viz_dir = Path("outputs/demo_visualizations")
+
+for file in sorted(viz_dir.glob("*.png")):
+    print(file.name)
+
+print()
+
+print("Saved to")
+
+print(viz_dir.resolve())

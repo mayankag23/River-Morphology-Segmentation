@@ -28,7 +28,7 @@ project:
   name:        "river_morphology"
   version:     "1.0.0"
   description: "Automated semantic segmentation of river morphology using Landsat imagery"
-  author:      ""    # Your name or organization
+  author:      "Mayank"    # Your name or organization
 
 
 # ------------------------------------------------------------------------------

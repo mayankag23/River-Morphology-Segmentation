@@ -348,3 +348,4 @@ class PatchGenerator:
         manifest_cfg = getattr(getattr(self._config, "export", None), "manifest", None)
         raw          = getattr(manifest_cfg, "formats", ["csv", "json"])
         return [str(f).lower() for f in raw]
+    

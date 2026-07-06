@@ -1103,4 +1103,197 @@ tests/morphology/
 │── test_morphology_uncertainty.py
 │── test_morphology_validator.py
 
+## Module 18 - River Morphology Visualization Framework
+
+Status: APPROVED
+
+Completion Date: 8 July, 2026
+
+Test Status: All tests passed
+Coverage: >95% (Overall Project Coverage: 95%)
+
+Features Implemented:
+
+- VisualizationEngine
+- VisualizationFactory
+- VisualizationValidator
+- VisualizationResult
+- VisualizationConfig
+- FigureSpec
+- MaskRenderer
+- OverlayRenderer
+- TimelineRenderer
+- ComparisonRenderer
+- FigureExporter
+- ClassColorMap
+- ColorRegistry
+- Segmentation Mask Rendering
+- Per-class Visualization
+- RGB Prediction Overlay
+- Confidence Map Visualization
+- Uncertainty Visualization
+- Temporal Timeline Visualization
+- Seasonal Trend Visualization
+- Hydrological Year Visualization
+- Before/After Comparison
+- Side-by-side Comparison
+- Change Detection Visualization
+- Class Difference Visualization
+- PNG Export
+- SVG Export
+- PDF Export
+- Metadata Preservation
+- Configuration-driven Color Mapping
+- Configuration-driven Rendering
+- Deterministic Figure Generation
+
+Architecture Decisions:
+
+- VisualizationEngine is the only public visualization interface.
+- VisualizationFactory constructs every renderer through dependency injection.
+- Rendering is completely independent from morphology calculations.
+- RiverMorphologyResult is consumed directly without recomputation.
+- Color management is centralized through ColorRegistry.
+- All rendering parameters are configuration-driven.
+- Figure exporting is isolated from rendering logic.
+- Timeline rendering is independent from comparison rendering.
+- Overlay rendering is independent from mask rendering.
+- Validation is separated from visualization logic.
+- Matplotlib is lazily imported for headless execution.
+- Supports future interactive visualization backends.
+- Compatible with Module 17 RiverMorphologyResult.
+- Production-ready scientific visualization framework.
+
+Coverage Refinement:
+
+Production implementation remained unchanged.
+
+Additional unit tests were added to increase coverage from approximately 60% to over 95%.
+
+Coverage improvements include:
+
+- comparison.py
+- timeline.py
+- engine.py
+- factory.py
+- overlay.py
+- renderer.py
+
+Additional tests cover:
+
+- renderer branches
+- comparison rendering
+- timeline rendering
+- seasonal rendering
+- engine orchestration
+- factory configuration branches
+- overlay edge cases
+- confidence visualization
+- metadata preservation
+- deterministic rendering
+- export paths
+- validation branches
+
+No public APIs changed.
+
+No production behavior changed.
+
+src/visualization/
+│── __init__.py
+│── colormap.py
+│── comparison.py
+│── contracts.py
+│── engine.py
+│── exporter.py
+│── factory.py
+│── overlay.py
+│── renderer.py
+│── timeline.py
+│── validator.py
+
+tests/visualization/
+│── __init__.py
+│── test_visualization_contracts_colormap.py
+│── test_visualization_renderer_overlay_exporter_validator.py
+│── test_visualization_timeline_comparison_engine.py
+│── test_visualization_coverage_boost.py
+
+## Module 19 - Reporting & Experiment Management Framework
+
+Status: APPROVED
+
+Completion Date: 8 July, 2026
+
+Test Status: All tests passed
+Coverage:  (Overall Project Coverage: 56%)
+
+Features Implemented:
+
+- ReportEngine
+- ReportFactory
+- ReportGenerator
+- ReportValidator
+- ReportExporter
+- ArtifactManager
+- ExperimentManager
+- ManifestManager
+- ReportResult
+- ReportingConfig
+- ArtifactRecord
+- ExperimentMetadata
+- ReportManifest
+- Markdown Report Generation
+- JSON Report Generation
+- CSV Report Generation
+- PDF-ready Report Architecture
+- Experiment Tracking
+- Configuration Snapshot Management
+- Artifact Inventory
+- Report Manifest Generation
+- Report Metadata Generation
+- Report Versioning
+- Execution Timestamp Tracking
+- Git Version Tracking
+- Dataset Version Tracking
+- Model Version Tracking
+- Checkpoint Metadata Support
+- Visualization Integration
+- Morphology Statistics Integration
+- Evaluation Metrics Integration
+- Configuration-driven Reporting Pipeline
+
+Architecture Decisions:
+
+- ReportEngine is the only public reporting interface.
+- ReportFactory constructs all reporting components.
+- ReportGenerator assembles report content without recomputing analytics.
+- ReportExporter handles all report exports.
+- ArtifactManager maintains all generated artifacts.
+- ExperimentManager records execution metadata.
+- Manifest generation is independent from report generation.
+- Validation is separated from reporting logic.
+- Fully configuration-driven.
+- Compatible with Modules 15–18.
+- Ready for future HTML and interactive reports.
+- Production-ready reporting and experiment management framework.
+
+src/reporting/
+│── __init__.py
+│── artifact.py
+│── contracts.py
+│── engine.py
+│── experiment.py
+│── exporter.py
+│── factory.py
+│── manifest.py
+│── report.py
+│── validator.py
+
+tests/reporting/
+│── __init__.py
+│── test_reporting_artifact_experiment_manifest
+│── test_reporting_contracts.py
+│── test_reporting_report_exporter_validator_engine.py
+
+
 

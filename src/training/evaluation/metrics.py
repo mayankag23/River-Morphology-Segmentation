@@ -91,7 +91,17 @@ class MetricRegistry:
 
 def _safe_div(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
     """Element-wise safe division; returns 0.0 where denominator == 0."""
-    return np.where(denominator > _EPS, numerator / denominator, 0.0)
+    # return np.where(denominator > _EPS, numerator / denominator, 0.0)
+    result = np.zeros_like(numerator, dtype=float)
+
+    np.divide(
+        numerator,
+        denominator,
+        out=result,
+        where=denominator > _EPS,
+    )
+
+    return result  
 
 
 def _per_class_tp_fp_fn_tn(cm: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
