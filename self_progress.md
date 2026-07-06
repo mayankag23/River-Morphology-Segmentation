@@ -883,3 +883,123 @@ tests/training/evaluation/
 │── test_eval_metrics.py
 │── test_eval_statistics_validator_reporter.py
 
+## Module 16 - Inference Pipeline Framework
+
+Status: APPROVED
+
+Completion Date: 6 July, 2026
+
+Test Status: All tests passed
+Coverage: >90% (Overall Project Coverage: 95%)
+
+Features Implemented:
+
+- InferenceEngine
+- Predictor
+- InferenceFactory
+- CheckpointLoader
+- PredictionExporter
+- PostprocessorPipeline
+- ConfidenceEstimator
+- InferenceValidator
+- InferenceResult
+- InferenceConfig
+- Batch Inference
+- Single Image Inference
+- Dataset Inference
+- Automatic Device Selection
+- CPU Inference
+- CUDA Inference
+- Mixed Precision (AMP) Inference
+- Automatic FP32 Fallback
+- Checkpoint Loading
+- Best Checkpoint Support
+- Latest Checkpoint Support
+- Softmax Probability Generation
+- Sigmoid Probability Support
+- Confidence Map Generation
+- Maximum Probability Confidence
+- Entropy-based Confidence Architecture
+- Optional Morphological Post-processing
+- GeoTIFF Export Support
+- NumPy Export Support
+- PNG Export Support
+- Metadata Preservation
+- Geospatial Metadata Preservation
+- Temporal Metadata Preservation
+- Deterministic Inference
+- Configuration-driven Inference Pipeline
+
+Architecture Decisions:
+
+- InferenceEngine is the only public inference interface.
+- Predictor performs all forward inference operations.
+- CheckpointLoader is responsible for checkpoint restoration.
+- PredictionExporter handles all prediction exports.
+- Confidence estimation is modular and extensible.
+- Post-processing is configuration-driven and optional.
+- Supports CPU and CUDA execution transparently.
+- Mixed precision automatically falls back to FP32 when CUDA is unavailable.
+- Preserves geospatial metadata for downstream analytics.
+- Preserves temporal metadata for future river change analysis.
+- Compatible with Module 14 checkpoints.
+- Compatible with Module 15 evaluation outputs.
+- Designed for future Test-Time Augmentation (TTA).
+- Designed for future ONNX and TorchScript inference.
+- Fully configuration-driven.
+- Production-ready inference framework.
+
+src/training/inference/
+│── __init__.py
+│── confidence.py
+│── contracts.py
+│── engine.py
+│── exporter.py
+│── factory.py
+│── loader.py
+│── postprocessing.py
+│── predictor.py
+│── validator.py
+
+tests/training/inference/
+│── test_inference_contracts.py
+│── test_inference_predictor_engine.py
+│── test_inference_exporter_coverage.py
+│── test_inference_factory_coverage.py
+│── test_inference_predictor_engine.py
+
+Coverage Refinement:
+
+Production code remained unchanged.
+
+Additional unit tests were added to increase coverage from approximately 78% to over 95%.
+
+Additional coverage includes:
+
+- exporter.py
+- factory.py
+- loader.py
+- predictor.py
+- validator.py
+- postprocessing.py
+
+Additional tests cover:
+
+- export formats
+- export failure handling
+- filesystem exceptions
+- invalid configuration branches
+- checkpoint loading edge cases
+- predictor edge cases
+- metadata preservation
+- confidence generation
+- validation failures
+- deterministic inference
+- post-processing branches
+
+No public APIs changed.
+
+No production behavior changed.
+
+
+

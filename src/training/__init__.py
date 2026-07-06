@@ -273,3 +273,56 @@ from src.training.engine import (
     TrainingValidator,
     TrainingHistory,
 )
+
+# ==============================================================================
+# MODULE 15 EXPORTS -- Model Evaluation Framework
+# All imports below are additive. No Module 11/12/13/14 symbol is removed.
+# ==============================================================================
+
+from src.training.evaluation import (
+    EvaluationEngine,
+    EvaluationConfig,
+    ClassMetrics,
+    ConfusionMatrix,
+    PredictionStatistics,
+    EvaluationResult,
+    ConfusionMatrixAccumulator,
+    MetricRegistry,
+    compute_all_metrics,
+    PredictionStatisticsAccumulator,
+    EvaluationValidator,
+    EvaluationValidationResult,
+    EvaluationReporter,
+    EvaluationFactory,
+    Evaluator,
+)
+
+# ==============================================================================
+# MODULE 16 EXPORTS -- Inference Pipeline Framework
+# All imports below are additive. No Module 11-15 symbol is removed.
+# ==============================================================================
+
+from src.training.inference import (
+    InferenceEngine,
+    InferenceConfig,
+    CheckpointMetadata,
+    SamplePrediction,
+    InferenceResult,
+    CheckpointLoader,
+    ConfidenceStrategy,
+    ConfidenceRegistry,
+    MaxProbabilityStrategy,
+    EntropyStrategy,
+    MaskPostprocessor,
+    PostprocessorRegistry,
+    PostprocessorPipeline,
+    HoleFiller,
+    SmallObjectRemover,
+    MorphOpenProcessor,
+    MorphCloseProcessor,
+    Predictor,
+    PredictionExporter,
+    InferenceValidator,
+    InferenceValidationResult,
+    InferenceFactory,
+)
