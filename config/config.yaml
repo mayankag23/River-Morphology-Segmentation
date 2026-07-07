@@ -89,16 +89,16 @@ gee:
 # The system raises an error if only some coordinates are set (partial config).
 # Leave all four as null if you will provide coordinates programmatically.
 # ------------------------------------------------------------------------------
-# aoi:
-#   min_lon: null    # Western boundary (longitude), e.g. 87.0
-#   min_lat: null    # Southern boundary (latitude),  e.g. 26.0
-#   max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
-#   max_lat: null    # Northern boundary (latitude),  e.g. 26.5
 aoi:
-  min_lon: 91.55
-  min_lat: 26.18
-  max_lon: 91.75
-  max_lat: 26.38
+  min_lon: null    # Western boundary (longitude), e.g. 87.0
+  min_lat: null    # Southern boundary (latitude),  e.g. 26.0
+  max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
+  max_lat: null    # Northern boundary (latitude),  e.g. 26.5
+# aoi:
+#   min_lon: 91.55
+#   min_lat: 26.18
+#   max_lon: 91.75
+#   max_lat: 26.38
   # Safety limit: AOIs wider than this may span multiple UTM zones, causing
   # spatial distortion in downloaded imagery. A warning is raised if exceeded.
   max_width_degrees: 3.0
@@ -791,3 +791,18 @@ dataset:
   output_formats: ["csv", "json"]
   dataset_version: "1.0.0"
 
+pipeline:
+  mode:       "full"          # or training/evaluation/inference/analysis/visualization/reporting
+  run_id:     ""              # auto-generated when empty
+  dry_run:    false
+  output_dir: "outputs"
+  aoi_ids:    []              # empty = all AOIs in config.aois or config.aoi
+  resume_from: ""
+
+# Optional multi-AOI batch:
+aois:
+  - id: "kosi"
+    min_lon: 87.0
+    min_lat: 26.0
+    max_lon: 87.5
+    max_lat: 26.5

@@ -292,5 +292,10 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if (report.all_exist and report.all_writable) else 1
 
 
+# if __name__ == "__main__":
+#     sys.exit(main())
+
 if __name__ == "__main__":
-    sys.exit(main())
+    from src.pipeline.cli import run_cli
+
+    sys.exit(run_cli())

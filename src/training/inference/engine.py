@@ -150,8 +150,7 @@ class InferenceEngine:
             # Step 7: Apply post-processing to each prediction.
             postprocessor = context["postprocessor"]
             for pred in raw_preds:
-                if len(postprocessor._processors) > 0:
-                    pred.predicted_mask = postprocessor.apply(pred.predicted_mask)
+                pred.predicted_mask = postprocessor.apply(pred.predicted_mask)
                 all_predictions.append(pred)
 
             ops.append(f"inference: {len(all_predictions)} samples")
