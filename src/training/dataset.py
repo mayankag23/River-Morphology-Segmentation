@@ -209,10 +209,44 @@ class RiverMorphologyDataset:
         image_np = self._read_image(Path(entry.patch_path))
         mask_np  = self._read_mask(Path(entry.mask_path))
 
+        # Remember which source pixels are NaN or Inf.
+        invalid_pixels = ~np.isfinite(image_np)
+
+        if np.any(invalid_pixels):
+            self._logger.debug(
+                "Sample %s contains %d non-finite image values; "
+                "replacing them with neutral normalized values.",
+                entry.sample_id,
+                int(invalid_pixels.sum()),
+            )
+
+        # Normalize using training statistics.
         if self._norm_stats is not None:
             image_np = self._norm_stats.normalize(image_np)
 
+        # Invalid/nodata pixels should be zero in normalized space.
+        # Zero represents the training-band mean after standardization.
+        image_np[invalid_pixels] = 0.0
+
+        # Final protection against NaN or Inf generated during normalization.
+        image_np = np.nan_to_num(
+            image_np,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        ).astype(np.float32, copy=False)
+
         image_np, mask_np = self._transform(image_np, mask_np)
+
+        # Transform/index calculations may generate new NaN or Inf values.
+        # Sanitize once more before conversion to a torch tensor.
+        image_np = np.nan_to_num(
+            image_np,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        ).astype(np.float32, copy=False)
+
 
         mask_np = np.where(
             mask_np == self._nodata_value,
