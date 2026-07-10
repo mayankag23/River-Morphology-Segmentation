@@ -125,6 +125,9 @@ class DataLoaderBundle:
     split_strategy:           str
     aug_config:               AugmentationConfig
     dl_config:                DataLoaderConfig
+    train_dataset:            Any
+    validation_dataset:       Any
+    test_dataset:             Any
 
     def summary_lines(self) -> list[str]:
         """Return ASCII-formatted summary lines."""
@@ -336,6 +339,9 @@ class DataLoaderFactory:
             train_loader       = train_loader,
             val_loader          = val_loader,
             test_loader         = test_loader,
+            train_dataset=train_ds,
+            validation_dataset=val_ds,
+            test_dataset=test_ds,
             norm_stats          = norm_stats,
             class_weights       = class_weights,
             norm_stats_path     = norm_stats_path,
