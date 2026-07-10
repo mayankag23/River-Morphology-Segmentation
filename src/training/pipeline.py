@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from dataclasses import asdict, dataclass, is_dataclass
 
 import numpy as np
 
@@ -113,31 +114,108 @@ class AugmentedDataset:
                 reason=f"base_dataset[{index}] raised: {exc}",
             ) from exc
 
-        # Unpack; Module 11 may return (image, mask) or (image, mask, meta_dict).
+        # # Unpack; Module 11 may return (image, mask) or (image, mask, meta_dict).
+        # image_tensor = item[0]
+        # mask_tensor  = item[1]
+        # meta         = item[2] if len(item) > 2 else {}
+
+        # # Convert to numpy.
+        # image_np = _to_numpy_float32(image_tensor)
+        # mask_np  = _to_numpy_uint8(mask_tensor)
+
+        # sample = TransformSample(
+        #     image            = image_np,
+        #     mask              = mask_np,
+        #     sample_id         = str(meta.get("sample_id", str(index))),
+        #     split             = self._split,
+        #     acquisition_date  = str(meta.get("acquisition_date", "")),
+        #     season            = str(meta.get("season", "")),
+        #     hydrological_year = int(meta.get("hydrological_year", 0)),
+        #     sensor            = str(meta.get("sensor", "")),
+        #     river_name        = str(meta.get("river_name", "")),
+        #     reach_id          = str(meta.get("reach_id", "")),
+        #     basin_id          = str(meta.get("basin_id", "")),
+        #     aoi_id            = str(meta.get("aoi_id", "")),
+        #     patch_path        = str(meta.get("patch_path", "")),
+        #     mask_path         = str(meta.get("mask_path", "")),
+        #     metadata          = dict(meta),
+        # )
+
+
+        # Unpack; Module 11 returns (image, mask, SampleMetadata)
         image_tensor = item[0]
         mask_tensor  = item[1]
-        meta         = item[2] if len(item) > 2 else {}
+        meta         = item[2] if len(item) > 2 else None
 
         # Convert to numpy.
         image_np = _to_numpy_float32(image_tensor)
         mask_np  = _to_numpy_uint8(mask_tensor)
 
+        # sample = TransformSample(
+        #     image=image_np,
+        #     mask=mask_np,
+        #     sample_id=meta.sample_id if meta else str(index),
+        #     split=meta.split if meta else self._split,
+        #     acquisition_date=meta.acquisition_date if meta else "",
+        #     season=meta.season if meta else "",
+        #     hydrological_year=meta.hydrological_year if meta else 0,
+        #     sensor=meta.sensor if meta else "",
+        #     river_name=meta.river_name if meta else "",
+        #     reach_id=meta.reach_id if meta else "",
+        #     basin_id=meta.basin_id if meta else "",
+        #     aoi_id=meta.aoi_id if meta else "",
+        #     patch_path=meta.patch_path if meta else "",
+        #     mask_path=meta.mask_path if meta else "",
+        #     metadata=asdict(meta) if meta else {},
+        # )
+        # Normalize metadata to one dictionary representation.
+        if meta is None:
+            meta_dict: dict[str, Any] = {}
+        elif isinstance(meta, dict):
+            meta_dict = dict(meta)
+        elif is_dataclass(meta):
+            meta_dict = asdict(meta)
+        else:
+            # # Support compatible metadata objects without requiring one concrete class.
+            # meta_dict = {
+            #     field: getattr(meta, field)
+            #     for field in (
+            #         "sample_id",
+            #         "split",
+            #         "acquisition_date",
+            #         "season",
+            #         "hydrological_year",
+            #         "sensor",
+            #         "river_name",
+            #         "reach_id",
+            #         "basin_id",
+            #         "aoi_id",
+            #         "patch_path",
+            #         "mask_path",
+            #     )
+            #     if hasattr(meta, field)
+            # }
+            raise TypeError(
+                "AugmentedDataset expected metadata to be a dictionary, "
+                f"dataclass, or None, but received {type(meta).__name__}."
+            )
+ 
         sample = TransformSample(
-            image            = image_np,
-            mask              = mask_np,
-            sample_id         = str(meta.get("sample_id", str(index))),
-            split             = self._split,
-            acquisition_date  = str(meta.get("acquisition_date", "")),
-            season            = str(meta.get("season", "")),
-            hydrological_year = int(meta.get("hydrological_year", 0)),
-            sensor            = str(meta.get("sensor", "")),
-            river_name        = str(meta.get("river_name", "")),
-            reach_id          = str(meta.get("reach_id", "")),
-            basin_id          = str(meta.get("basin_id", "")),
-            aoi_id            = str(meta.get("aoi_id", "")),
-            patch_path        = str(meta.get("patch_path", "")),
-            mask_path         = str(meta.get("mask_path", "")),
-            metadata          = dict(meta),
+            image=image_np,
+            mask=mask_np,
+            sample_id=str(meta_dict.get("sample_id", index)),
+            split=str(meta_dict.get("split", self._split)),
+            acquisition_date=str(meta_dict.get("acquisition_date", "")),
+            season=str(meta_dict.get("season", "")),
+            hydrological_year=int(meta_dict.get("hydrological_year", 0)),
+            sensor=str(meta_dict.get("sensor", "")),
+            river_name=str(meta_dict.get("river_name", "")),
+            reach_id=str(meta_dict.get("reach_id", "")),
+            basin_id=str(meta_dict.get("basin_id", "")),
+            aoi_id=str(meta_dict.get("aoi_id", "")),
+            patch_path=str(meta_dict.get("patch_path", "")),
+            mask_path=str(meta_dict.get("mask_path", "")),
+            metadata=meta_dict,
         )
 
         sample = self._transform.apply(sample)
