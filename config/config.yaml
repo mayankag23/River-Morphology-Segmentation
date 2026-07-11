@@ -89,16 +89,16 @@ gee:
 # The system raises an error if only some coordinates are set (partial config).
 # Leave all four as null if you will provide coordinates programmatically.
 # ------------------------------------------------------------------------------
-aoi:
-  min_lon: null    # Western boundary (longitude), e.g. 87.0
-  min_lat: null    # Southern boundary (latitude),  e.g. 26.0
-  max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
-  max_lat: null    # Northern boundary (latitude),  e.g. 26.5
 # aoi:
-#   min_lon: 91.55
-#   min_lat: 26.18
-#   max_lon: 91.75
-#   max_lat: 26.38
+#   min_lon: null    # Western boundary (longitude), e.g. 87.0
+#   min_lat: null    # Southern boundary (latitude),  e.g. 26.0
+#   max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
+#   max_lat: null    # Northern boundary (latitude),  e.g. 26.5
+aoi:
+  min_lon: 87.0
+  min_lat: 26.0
+  max_lon: 87.5
+  max_lat: 26.5
   # Safety limit: AOIs wider than this may span multiple UTM zones, causing
   # spatial distortion in downloaded imagery. A warning is raised if exceeded.
   max_width_degrees: 3.0
@@ -113,8 +113,8 @@ aoi:
 # Both values must be set together, or both left null.
 # ------------------------------------------------------------------------------
 date_range:
-  start: null    # e.g. "2023-11-01"
-  end:   null    # e.g. "2024-02-28"
+  start: "2023-11-01"    # e.g. "2023-11-01"
+  end:   "2024-02-28"    # e.g. "2024-02-28"
 
 
 # ------------------------------------------------------------------------------
@@ -342,8 +342,10 @@ classes:
 #   "Linknet"       — Lightest option; use only when compute is severely constrained
 #   "MAnet"         — Multi-scale attention; experimental alternative to UnetPlusPlus
 # ------------------------------------------------------------------------------
+# model:
+#   architecture:    "unetplusplus"
 model:
-  architecture:    "UnetPlusPlus"
+  architecture: "UnetPlusPlus"
   encoder_name:    "efficientnet-b4"
   encoder_weights: "imagenet"       # Pretrain from ImageNet; never train from scratch
   in_channels:     11               # Must equal num_channels
@@ -459,7 +461,7 @@ augmentation:
 # Training Configuration
 # ------------------------------------------------------------------------------
 training:
-  num_epochs:  150
+  num_epochs:  3 #100
   batch_size:  8     # Per-GPU; for T4 16 GB at patch_size=512 with 11 channels
 
   num_workers:  4    # Parallel data loading. Set to 0 on Windows if errors occur.
@@ -550,6 +552,12 @@ inference:
   # Test-Time Augmentation: average over flipped/rotated variants.
   # Adds ~1–2% IoU at 4× inference time cost.
   tta_enabled: false
+  checkpoint_strategy:  "best"     # "best", "latest", or "explicit"
+  checkpoint_dir:       "checkpoints"   # Where to look for checkpoints
+  output_dir:           "predictions"   # Where predictions are written
+  export_numpy:         true    # Write mask as .npy
+  export_geotiff:       false   # Write GeoTIFF (requires rasterio)
+  export_png:           false   # Write mask PNG
 
 
 # ------------------------------------------------------------------------------
@@ -790,6 +798,18 @@ dataset:
     reject_corrupted:       true
   output_formats: ["csv", "json"]
   dataset_version: "1.0.0"
+
+# Add a visualization output dir so figures are written to disk:
+visualization:
+  output_dir: "outputs/visualizations"
+  export_png: true
+
+# Add reporting section if not present:
+reporting:
+  output_dir: "reports"
+  export_json: true
+  export_csv:  true
+  export_pdf:  false
 
 pipeline:
   mode:       "full"          # or training/evaluation/inference/analysis/visualization/reporting
