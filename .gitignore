@@ -25,3 +25,20 @@ __pycache__/
 
 # Raster auxiliary files
 *.aux.xml
+
+htmlcov/
+.coverage
+coverage.xml
+# Runtime outputs
+checkpoints/
+predictions/
+reports/
+outputs/visualizations/
+
+# Local configuration and temporary review files
+/config.yaml
+/orches_safe.py
+/trainer_review.diff
+/trainer_working_backup.py
+/working_tree_before_training_cleanup.patch
+/working_tree_status_before_cleanup.txt
