@@ -175,6 +175,18 @@ satellite:
 #   9     BSI        (computed)      Bare soil / sand indicator
 #  10     AWEInsh    (computed)      Turbid and shadow water detection
 # ------------------------------------------------------------------------------
+features:
+  ndwi: true
+  mndwi: true
+  awei_sh: false
+  awei_nsh: true
+  ndvi: true
+  savi: false
+  bsi: true
+  ndmi: false
+  ndbi: false
+  savi_soil_factor: 0.5
+
 spectral_bands:
   - name: "B2"
     gee_name: "SR_B2"
