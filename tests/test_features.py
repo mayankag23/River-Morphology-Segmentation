@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from src.gee.harmonization import OPTICAL_BAND_NAMES
+
 import pytest
 
 from src.core.exceptions import InvalidValueError
@@ -350,8 +352,15 @@ class TestGenerateAllFeatures:
         result = gen.generate(comp)
         all_bands = result.all_band_names
 
-        for band in COMMON_BAND_NAMES:
+        for band in OPTICAL_BAND_NAMES:
             assert band in all_bands
+
+        assert "Thermal" not in all_bands
+        assert "QA_PIXEL" not in all_bands
+
+        for feature_name in result.features_computed:
+            assert feature_name in all_bands
+
         for idx in result.features_computed:
             assert idx in all_bands
 
@@ -394,19 +403,51 @@ class TestGenerateAllFeatures:
         ]
         assert list(result.features_computed) == expected_order
 
+    # def test_add_bands_called_for_each_enabled_feature(
+    #     self, tmp_path: Path
+    # ) -> None:
+    #     cfg    = _make_config(tmp_path)
+    #     client = _make_mock_client()
+    #     gen    = SpectralFeatureGenerator(client, cfg)
+    #     img    = MagicMock(name="composite_image")
+    #     img.addBands.return_value = img
+    #     comp   = _make_composite_result(image=img)
+
+    #     result = gen.generate(comp)
+    #     # addBands should be called once per computed feature.
+    #     # assert img.addBands.call_count == len(result.features_computed)
+
+    #     selected_img = img.select.return_value
+
+    #     # assert img.select.call_count == 1
+    #     # img.select.assert_called_once_with(list(OPTICAL_BAND_NAMES))
+
+    #     assert selected_img.addBands.call_count == len(
+    #         result.features_computed
+    #     )
     def test_add_bands_called_for_each_enabled_feature(
         self, tmp_path: Path
     ) -> None:
-        cfg    = _make_config(tmp_path)
+        cfg = _make_config(tmp_path)
         client = _make_mock_client()
-        gen    = SpectralFeatureGenerator(client, cfg)
-        img    = MagicMock(name="composite_image")
-        img.addBands.return_value = img
-        comp   = _make_composite_result(image=img)
+        gen = SpectralFeatureGenerator(client, cfg)
+
+        img = MagicMock(name="composite_image")
+
+        # Use one stable mock for the model stack so chained addBands()
+        # calls are recorded on the same object.
+        selected_img = MagicMock(name="model_base_image")
+        selected_img.addBands.return_value = selected_img
+
+        img.select.return_value = selected_img
+
+        comp = _make_composite_result(image=img)
 
         result = gen.generate(comp)
-        # addBands should be called once per computed feature.
-        assert img.addBands.call_count == len(result.features_computed)
+
+        assert selected_img.addBands.call_count == len(
+            result.features_computed
+        )
 
 
 # ==============================================================================
@@ -516,6 +557,10 @@ class TestGenerateSingleIndex:
         nir_mock.multiply.return_value = nir_mock
         img.select.side_effect = lambda b: nir_mock
         img.addBands.return_value = img
+
+        selected_img = MagicMock(name="model_base_image")
+        selected_img.addBands.return_value = selected_img
+        img.select.return_value = selected_img
         comp = _make_composite_result(image=img)
 
         gen.generate_single_index(comp, "SAVI", soil_factor=0.1)

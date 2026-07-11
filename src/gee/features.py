@@ -43,6 +43,7 @@ import functools
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
+from src.gee.harmonization import OPTICAL_BAND_NAMES
 
 from src.core.config import Config
 from src.core.exceptions import InvalidValueError
@@ -288,11 +289,36 @@ class SpectralFeatureGenerator:
         if not composite_band_names:
             composite_band_names = tuple(str(b) for b in BUILT_IN_INDICES[0:0])
 
-        # Initialize assembler with the composite image.
+
+        # Keep the full harmonized composite available for spectral-index
+        # computation, but expose only the six optical reflectance bands in
+        # the final machine-learning feature stack. Thermal and QA_PIXEL are
+        # preprocessing/quality-control bands and are not model inputs.
+        model_base_band_names = tuple(OPTICAL_BAND_NAMES)
+
+        try:
+            model_base_image = composite_result.image.select(
+                list(model_base_band_names)
+            )
+        except Exception as exc:
+            raise GEEAPIError(
+                operation="select_model_base_bands",
+                reason=(
+                    "Failed to select the optical model-input bands "
+                    f"{list(model_base_band_names)}: {exc}"
+                ),
+            ) from exc
+
         assembler = FeatureStackAssembler(
-            base_image=composite_result.image,
-            base_band_names=composite_band_names,
+            base_image=model_base_image,
+            base_band_names=model_base_band_names,
         )
+
+        # # Initialize assembler with the composite image.
+        # assembler = FeatureStackAssembler(
+        #     base_image=composite_result.image,
+        #     base_band_names=composite_band_names,
+        # )
 
         # Build a function map that handles SAVI's extra parameter.
         function_map = self._build_function_map(cfg)
