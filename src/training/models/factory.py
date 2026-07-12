@@ -82,7 +82,7 @@ class ModelFactory:
         operations.append("validation: passed")
 
         # Step 3: Retrieve model class from registry.
-        model_cls = ModelRegistry.get(model_config.architecture)
+        model_cls = ModelRegistry.get(str(model_config.architecture).strip().lower())
         operations.append(f"registry: resolved '{model_config.architecture}' -> {model_cls.__name__}")
 
         # Step 4: Seed RNG for deterministic initialization.
