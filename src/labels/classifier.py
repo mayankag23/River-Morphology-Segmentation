@@ -143,7 +143,8 @@ class SpectralClassificationEngine:
 
         # Assign each pixel to the rule with the highest evidence score.
         for result in rule_results:
-            better = result.confidence > confidence_map
+            eligible = result.pixel_mask
+            better = eligible & (result.confidence > confidence_map)
             class_map[better]      = result.class_id
             confidence_map[better] = result.confidence[better]
 
