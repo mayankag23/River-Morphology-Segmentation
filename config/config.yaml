@@ -357,7 +357,7 @@ classes:
 # model:
 #   architecture:    "unetplusplus"
 model:
-  architecture: "UnetPlusPlus"
+  architecture: "unetplusplus"
   encoder_name:    "efficientnet-b4"
   encoder_weights: "imagenet"       # Pretrain from ImageNet; never train from scratch
   in_channels:     11               # Must equal num_channels
