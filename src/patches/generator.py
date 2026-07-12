@@ -209,6 +209,10 @@ class PatchGenerator:
         generated = 0
         skipped   = 0
 
+        # Keep the persistent manifest cumulative, but return only entries
+        # generated for this scene to downstream pipeline stages.
+        current_scene_entries: list[PatchManifestEntry] = []
+
         with PatchReader(image_path) as reader:
             windows = tiler.compute_windows(reader.width, reader.height)
             operations.append(f"tiling: {len(windows)} candidate window(s)")
@@ -258,13 +262,31 @@ class PatchGenerator:
                     created_at=datetime.now(timezone.utc).isoformat(),
                 )
                 manifest_manager.add_entry(entry)
+                current_scene_entries.append(entry)
                 generated += 1
 
         operations.append(f"generated: {generated}, skipped: {skipped}")
 
         manifest_formats = self._read_manifest_formats()
-        manifest = manifest_manager.save(output_dir, formats=manifest_formats)
-        operations.append(f"write_manifest: {manifest.entry_count} total entries")
+
+        # Persist the complete historical + current manifest.
+        persisted_manifest = manifest_manager.save(
+            output_dir,
+            formats=manifest_formats,
+        )
+        operations.append(
+            f"write_manifest: {persisted_manifest.entry_count} total entries"
+        )
+
+        # Downstream stages must process only this generation call's patches.
+        manifest = PatchManifest(
+            entries=tuple(current_scene_entries),
+            csv_path=persisted_manifest.csv_path,
+            json_path=persisted_manifest.json_path,
+        )
+        operations.append(
+            f"return_manifest: {manifest.entry_count} current-scene entries"
+        )
 
         result = PatchDatasetResult(
             scene_id=scene_id,
