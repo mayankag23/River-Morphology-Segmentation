@@ -184,16 +184,71 @@ class PipelineOrchestrator:
                 for stage in stages:
                     all_results.append(runner.run(stage, aoi.aoi_id, lambda: None))
         else:
+            # M2-M9 are AOI-local. M10-M19 consume one aggregated,
+            # leakage-safe dataset and therefore execute only once.
+            global_start = "dataset"
+            if global_start in stages:
+                split_index = stages.index(global_start)
+                aoi_stages = stages[:split_index]
+                global_stages = stages[split_index:]
+            else:
+                aoi_stages = stages
+                global_stages = ()
+
+            aggregate_state: dict = {
+                "patch_results": [],
+                "label_results": [],
+            }
+            fatal = False
+
             for aoi in aoi_configs:
                 out_dir = PipelineFactory.make_output_dir(
                     self._pipeline_config.output_dir, run_id, aoi.aoi_id
                 )
                 output_dirs[aoi.aoi_id] = out_dir
-                aoi_results, fatal = self._run_aoi(aoi, stages, runner, out_dir)
+
+                aoi_results, aoi_fatal, aoi_state = self._run_aoi(
+                    aoi,
+                    aoi_stages,
+                    runner,
+                    out_dir,
+                    return_state=True,
+                )
                 all_results.extend(aoi_results)
-                if fatal:
-                    ops.append(f"ABORTED after fatal error in AOI '{aoi.aoi_id}'")
+
+                if aoi_fatal:
+                    ops.append(
+                        f"ABORTED after fatal error in AOI '{aoi.aoi_id}'"
+                    )
+                    fatal = True
                     break
+
+                patch_result = aoi_state.get("patches")
+                label_result = aoi_state.get("pseudo_labels")
+
+                if patch_result is not None:
+                    aggregate_state["patch_results"].append(patch_result)
+                if label_result is not None:
+                    aggregate_state["label_results"].append(label_result)
+
+            if not fatal and global_stages:
+                global_aoi = aoi_configs[0]
+                global_out_dir = str(
+                    Path(self._pipeline_config.output_dir) / run_id / "global"
+                )
+                output_dirs["global"] = global_out_dir
+
+                global_results, global_fatal = self._run_global(
+                    global_aoi,
+                    global_stages,
+                    runner,
+                    global_out_dir,
+                    aggregate_state,
+                )
+                all_results.extend(global_results)
+
+                if global_fatal:
+                    ops.append("ABORTED after fatal error in global stages")
 
         ops.append(f"completed: {len(all_results)} stage runs")
 
@@ -220,7 +275,8 @@ class PipelineOrchestrator:
         stages:  tuple[str, ...],
         runner:  StageRunner,
         out_dir: str,
-    ) -> tuple[list[StageResult], bool]:
+        return_state: bool = False,
+    ):
         """
         Execute all stages for one AOI.
 
@@ -244,7 +300,49 @@ class PipelineOrchestrator:
                     "Stage '%s' failed for AOI '%s': %s",
                     stage, aoi.aoi_id, result.error,
                 )
-                return results, True   # fatal — stop this AOI
+                if return_state:
+                    return results, True, stage_state
+                return results, True
+
+        if return_state:
+            return results, False, stage_state
+        return results, False
+
+    def _run_global(
+        self,
+        aoi: AOIConfig,
+        stages: tuple[str, ...],
+        runner: StageRunner,
+        out_dir: str,
+        stage_state: dict,
+    ) -> tuple[list[StageResult], bool]:
+        """Execute dataset and downstream stages once for all AOIs."""
+        results: list[StageResult] = []
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+
+        _LOGGER.info(
+            "=== GLOBAL: %d patch result(s), %d label result(s) ===",
+            len(stage_state.get("patch_results", [])),
+            len(stage_state.get("label_results", [])),
+        )
+
+        for stage in stages:
+            fn = self._build_stage_fn(
+                stage,
+                aoi,
+                out_dir,
+                stage_state,
+            )
+            result = runner.run(stage, "global", fn)
+            results.append(result)
+
+            if not result.success and not result.skipped:
+                _LOGGER.error(
+                    "Global stage '%s' failed: %s",
+                    stage,
+                    result.error,
+                )
+                return results, True
 
         return results, False
 
@@ -460,13 +558,26 @@ class PipelineOrchestrator:
                 # Public entry: src/dataset/assembler.py :: DatasetAssembler
                 # Input contracts: PatchDatasetResult + LabelDatasetResult
                 from src.dataset.assembler import DatasetAssembler
-                patch_result = stage_state.get("patches")
-                label_result = stage_state.get("pseudo_labels")
+                patch_results = stage_state.get("patch_results")
+                label_results = stage_state.get("label_results")
+
+                # Backward-compatible fallback for direct/single-AOI use.
+                if patch_results is None:
+                    patch_result = stage_state.get("patches")
+                    patch_results = (
+                        [patch_result] if patch_result is not None else []
+                    )
+
+                if label_results is None:
+                    label_result = stage_state.get("pseudo_labels")
+                    label_results = (
+                        [label_result] if label_result is not None else []
+                    )
+
                 assembler = DatasetAssembler(config)
-                # result    = assembler.assemble(patch_result, label_result)
                 result = assembler.assemble(
-                    patch_results=[patch_result],
-                    label_results=[label_result],
+                    patch_results=patch_results,
+                    label_results=label_results,
                     output_dir=config.paths.processed_dir,
                 )
                 stage_state["dataset"] = result
