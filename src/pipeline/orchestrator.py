@@ -103,7 +103,13 @@ _STAGE_ORDER: dict[str, tuple[str, ...]] = {
         "model",
         "inference",
     ),
-    "analysis":      ("analysis",),
+    "analysis":      (
+        "dataloader",
+        "transforms",
+        "model",
+        "inference",
+        "analysis",
+    ),
     "visualization": ("visualization",),
     "reporting":     ("reporting",),
 }
