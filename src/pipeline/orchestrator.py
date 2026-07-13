@@ -95,7 +95,7 @@ _STAGE_ORDER: dict[str, tuple[str, ...]] = {
     # training mode: load data → augment → build model → train
     "training":      ("dataloader", "transforms", "model", "training"),
     # evaluation mode: load data → augment → build model → train → evaluate
-    "evaluation":    ("dataloader", "transforms", "model", "training", "evaluation"),
+    "evaluation":    ("dataloader", "transforms", "model", "evaluation"),
     # remaining modes are single-stage; they read from checkpoint/disk
     "inference":     ("inference",),
     "analysis":      ("analysis",),
@@ -786,13 +786,49 @@ class PipelineOrchestrator:
         if stage == "evaluation":
             def fn():
                 # Module 15: EvaluationEngine → EvaluationResult
-                # Inputs: TrainingResult (M14) + TransformPipelineResult (M12)
-                from src.training.evaluation import EvaluationEngine, EvaluationConfig
-                eval_cfg        = EvaluationConfig.from_config(config)
-                engine          = EvaluationEngine(eval_cfg)
-                training_result = stage_state.get("training")
-                data_result     = stage_state.get("transforms")
-                result          = engine.evaluate(training_result, data_result)
+                #
+                # Full mode consumes the in-memory TrainingResult from M14.
+                # Standalone evaluation restores the configured checkpoint
+                # into the ModelResult constructed by M13.
+                from src.training.evaluation import (
+                    EvaluationConfig,
+                    EvaluationEngine,
+                )
+                from src.training.inference import InferenceConfig
+                from src.training.inference.loader import CheckpointLoader
+
+                eval_cfg = EvaluationConfig.from_config(config)
+                engine = EvaluationEngine(eval_cfg)
+
+                evaluation_input = stage_state.get("training")
+                data_result = stage_state.get("transforms")
+
+                if evaluation_input is None:
+                    model_result = stage_state.get("model")
+                    if model_result is None:
+                        raise RuntimeError(
+                            "Standalone evaluation requires ModelResult "
+                            "from the model stage."
+                        )
+
+                    inference_config = InferenceConfig.from_config(config)
+                    checkpoint_loader = CheckpointLoader(inference_config)
+
+                    checkpoint_path = checkpoint_loader.resolve_path()
+                    checkpoint_payload = checkpoint_loader.load(
+                        checkpoint_path
+                    )
+                    checkpoint_loader.restore_model(
+                        model_result.model,
+                        checkpoint_payload,
+                    )
+
+                    evaluation_input = model_result
+
+                result = engine.evaluate(
+                    evaluation_input,
+                    data_result,
+                )
                 stage_state["evaluation"] = result
                 return [str(Path(out_dir) / "evaluation")]
             return fn
