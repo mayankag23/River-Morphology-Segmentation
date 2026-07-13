@@ -42,3 +42,6 @@ outputs/visualizations/
 /trainer_working_backup.py
 /working_tree_before_training_cleanup.patch
 /working_tree_status_before_cleanup.txt
+
+# Local pipeline run logs
+*.log
