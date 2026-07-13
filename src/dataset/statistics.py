@@ -88,6 +88,55 @@ class SplitStatistics:
         """Return a JSON-serializable plain dict."""
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SplitStatistics":
+        """Reconstruct split statistics from persisted JSON data."""
+        return cls(
+            split_name=str(data["split_name"]),
+            sample_count=int(data["sample_count"]),
+            class_statistics=tuple(
+                ClassStatistics(
+                    class_id=int(item["class_id"]),
+                    class_name=str(item["class_name"]),
+                    pixel_count=int(item["pixel_count"]),
+                    sample_count=int(item["sample_count"]),
+                    percentage=float(item["percentage"]),
+                )
+                for item in data["class_statistics"]
+            ),
+            class_imbalance_ratio=float(data["class_imbalance_ratio"]),
+            water_sand_ratio=(
+                None
+                if data.get("water_sand_ratio") is None
+                else float(data["water_sand_ratio"])
+            ),
+            vegetation_sand_ratio=(
+                None
+                if data.get("vegetation_sand_ratio") is None
+                else float(data["vegetation_sand_ratio"])
+            ),
+            bare_sediment_fraction=(
+                None
+                if data.get("bare_sediment_fraction") is None
+                else float(data["bare_sediment_fraction"])
+            ),
+            seasonal_distribution=tuple(
+                SeasonCount(
+                    season=str(item["season"]),
+                    count=int(item["count"]),
+                )
+                for item in data["seasonal_distribution"]
+            ),
+            yearly_distribution=tuple(
+                YearCount(
+                    year=int(item["year"]),
+                    count=int(item["count"]),
+                )
+                for item in data["yearly_distribution"]
+            ),
+            total_valid_pixels=int(data["total_valid_pixels"]),
+        )
+
 
 class DatasetStatisticsCalculator:
     """

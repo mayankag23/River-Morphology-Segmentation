@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 from src.core.config import Config
 from src.core.exceptions import InvalidValueError
 from src.dataset.manifest import DatasetManifest
+from src.dataset.statistics import SplitStatistics
 from src.training.dataset import RiverMorphologyDataset
 from src.training.normalizer import DatasetNormalizer, NormalizationStats
 from src.training.sampler import TemporalSampler
@@ -36,9 +37,32 @@ from src.training.weights import ClassWeights
 if TYPE_CHECKING:
     from src.dataset.assembler import TrainingDatasetResult
 
-__all__ = ["DataLoaderConfig", "DataLoaderBundle", "DataLoaderFactory"]
+__all__ = [
+    "DataLoaderConfig",
+    "PersistedTrainingDataset",
+    "DataLoaderBundle",
+    "DataLoaderFactory",
+]
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+# ==============================================================================
+# PersistedTrainingDataset
+# ==============================================================================
+
+@dataclass(frozen=True)
+class PersistedTrainingDataset:
+    """
+    Minimal dataset contract required to construct training DataLoaders.
+
+    Used by standalone training and evaluation modes when Module 10 has
+    already persisted the assembled dataset to disk.
+    """
+
+    manifest: DatasetManifest
+    train_statistics: SplitStatistics
+    split_strategy: str
 
 
 # ==============================================================================

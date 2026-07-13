@@ -656,10 +656,66 @@ class PipelineOrchestrator:
                 # Public entry: src/training/dataloader.py :: DataLoaderFactory
                 # Input contract: TrainingDatasetResult (from M10)
                 # Output contract: DataLoaderBundle (train_loader, val_loader, test_loader)
-                from src.training.dataloader import DataLoaderFactory
+                import json
+
+                from src.dataset.manifest import DatasetManifest
+                from src.dataset.statistics import SplitStatistics
                 from src.labels.schema import ClassSchema
+                from src.training.dataloader import (
+                    DataLoaderFactory,
+                    PersistedTrainingDataset,
+                )
 
                 training_dataset_result = stage_state.get("dataset")
+
+                # Standalone training/evaluation modes begin at M11, so M10's
+                # in-memory result is unavailable. Reconstruct the minimal
+                # required contract from the persisted dataset artifacts.
+                if training_dataset_result is None:
+                    processed_dir = Path(config.paths.processed_dir)
+                    manifest_path = (
+                        processed_dir / "dataset_manifest.csv"
+                    )
+                    statistics_path = (
+                        processed_dir / "statistics.json"
+                    )
+
+                    if not manifest_path.is_file():
+                        raise FileNotFoundError(
+                            "Standalone training requires the persisted "
+                            f"dataset manifest: {manifest_path}"
+                        )
+
+                    if not statistics_path.is_file():
+                        raise FileNotFoundError(
+                            "Standalone training requires the persisted "
+                            f"dataset statistics: {statistics_path}"
+                        )
+
+                    statistics_data = json.loads(
+                        statistics_path.read_text(encoding="utf-8")
+                    )
+                    train_statistics_data = statistics_data.get("train")
+
+                    if not isinstance(train_statistics_data, dict):
+                        raise ValueError(
+                            "Persisted statistics must contain a "
+                            "'train' object."
+                        )
+
+                    training_dataset_result = PersistedTrainingDataset(
+                        manifest=DatasetManifest.from_csv(
+                            manifest_path
+                        ),
+                        train_statistics=SplitStatistics.from_dict(
+                            train_statistics_data
+                        ),
+                        split_strategy=str(
+                            config.dataset.split.strategy
+                        ),
+                    )
+                    stage_state["dataset"] = training_dataset_result
+
                 class_schema = ClassSchema.from_config(config)
 
                 # factory = DataLoaderFactory(config)
