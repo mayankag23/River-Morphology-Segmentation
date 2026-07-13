@@ -357,7 +357,7 @@ classes:
 # model:
 #   architecture:    "unetplusplus"
 model:
-  architecture: "unetplusplus"
+  architecture: "UnetPlusPlus"
   encoder_name:    "efficientnet-b4"
   encoder_weights: "imagenet"       # Pretrain from ImageNet; never train from scratch
   in_channels:     11               # Must equal num_channels
@@ -737,9 +737,9 @@ labels:
       ndvi_threshold:    0.20
       savi_threshold:    0.10
       ndmi_threshold:    0.00
-      ndvi_weight:       0.50
-      savi_weight:       0.30
-      ndmi_weight:       0.20
+      ndvi_weight:       1 #0.50
+      savi_weight:       0 #0.30
+      ndmi_weight:       0 #0.20
       confidence_scale:  0.25
       min_confidence:    0.35
 
