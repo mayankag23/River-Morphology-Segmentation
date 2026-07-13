@@ -97,7 +97,12 @@ _STAGE_ORDER: dict[str, tuple[str, ...]] = {
     # evaluation mode: load data → augment → build model → train → evaluate
     "evaluation":    ("dataloader", "transforms", "model", "evaluation"),
     # remaining modes are single-stage; they read from checkpoint/disk
-    "inference":     ("inference",),
+    "inference":     (
+        "dataloader",
+        "transforms",
+        "model",
+        "inference",
+    ),
     "analysis":      ("analysis",),
     "visualization": ("visualization",),
     "reporting":     ("reporting",),
@@ -837,27 +842,32 @@ class PipelineOrchestrator:
         if stage == "inference":
             def fn():
                 # Module 16: InferenceEngine → InferenceResult
-                # In full/evaluation mode: uses TrainingResult from stage_state.
-                # In standalone inference mode (--mode inference): no prior training
-                # stage runs, so we reconstruct the model from ModelFactory and
-                # let CheckpointLoader restore weights from checkpoint_dir.
-                from src.training.inference import InferenceEngine, InferenceConfig
-                from src.training.models.factory import ModelFactory
-                from src.training.models.contracts import ModelConfig
-                inf_cfg         = InferenceConfig.from_config(config)
-                engine          = InferenceEngine(inf_cfg)
-                training_result = stage_state.get("training")
-                data_result     = stage_state.get("transforms")
-                standalone_model = None
-                if training_result is None:
-                    # Standalone: build a fresh model architecture for checkpoint loading.
-                    model_cfg        = ModelConfig.from_config(config)
-                    model_result     = ModelFactory.build(model_cfg)
-                    standalone_model = model_result.model
+                #
+                # Full mode consumes TrainingResult from M14. Standalone
+                # inference consumes ModelResult from M13. InferenceEngine
+                # restores the configured checkpoint in both cases.
+                from src.training.inference import (
+                    InferenceConfig,
+                    InferenceEngine,
+                )
+
+                inf_cfg = InferenceConfig.from_config(config)
+                engine = InferenceEngine(inf_cfg)
+
+                inference_input = (
+                    stage_state.get("training")
+                    or stage_state.get("model")
+                )
+                data_result = stage_state.get("transforms")
+
+                if inference_input is None:
+                    raise RuntimeError(
+                        "Inference requires TrainingResult or ModelResult."
+                    )
+
                 result = engine.predict(
-                    training_result,
-                    data_result,
-                    model = standalone_model,
+                    training_result=inference_input,
+                    data_result=data_result,
                 )
                 stage_state["inference"] = result
                 return [str(Path(out_dir) / "inference")]
