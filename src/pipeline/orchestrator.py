@@ -176,19 +176,85 @@ class PipelineOrchestrator:
 
         if self._pipeline_config.dry_run:
             _LOGGER.info("DRY-RUN: plan printed; no stages executed.")
+
+            global_stage_names = {
+                "dataset",
+                "dataloader",
+                "transforms",
+                "model",
+                "training",
+                "evaluation",
+                "inference",
+                "analysis",
+                "visualization",
+                "reporting",
+            }
+            split_index = next(
+                (
+                    index
+                    for index, stage in enumerate(stages)
+                    if stage in global_stage_names
+                ),
+                None,
+            )
+
+            if split_index is not None:
+                aoi_stages = stages[:split_index]
+                global_stages = stages[split_index:]
+            else:
+                aoi_stages = stages
+                global_stages = ()
+
             for aoi in aoi_configs:
                 out_dir = PipelineFactory.make_output_dir(
-                    self._pipeline_config.output_dir, run_id, aoi.aoi_id
+                    self._pipeline_config.output_dir,
+                    run_id,
+                    aoi.aoi_id,
                 )
                 output_dirs[aoi.aoi_id] = out_dir
-                for stage in stages:
-                    all_results.append(runner.run(stage, aoi.aoi_id, lambda: None))
+
+                for stage in aoi_stages:
+                    all_results.append(
+                        runner.run(stage, aoi.aoi_id, lambda: None)
+                    )
+
+            if global_stages:
+                global_out_dir = str(
+                    Path(self._pipeline_config.output_dir)
+                    / run_id
+                    / "global"
+                )
+                output_dirs["global"] = global_out_dir
+
+                for stage in global_stages:
+                    all_results.append(
+                        runner.run(stage, "global", lambda: None)
+                    )
         else:
             # M2-M9 are AOI-local. M10-M19 consume one aggregated,
             # leakage-safe dataset and therefore execute only once.
-            global_start = "dataset"
-            if global_start in stages:
-                split_index = stages.index(global_start)
+            global_stage_names = {
+                "dataset",
+                "dataloader",
+                "transforms",
+                "model",
+                "training",
+                "evaluation",
+                "inference",
+                "analysis",
+                "visualization",
+                "reporting",
+            }
+            split_index = next(
+                (
+                    index
+                    for index, stage in enumerate(stages)
+                    if stage in global_stage_names
+                ),
+                None,
+            )
+
+            if split_index is not None:
                 aoi_stages = stages[:split_index]
                 global_stages = stages[split_index:]
             else:
