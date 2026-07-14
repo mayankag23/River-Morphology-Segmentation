@@ -83,6 +83,12 @@ class PredictionExporter:
             if p:
                 paths.append(p)
 
+            visual_paths = self._save_visual_products(
+                prediction,
+                sid,
+            )
+            paths.extend(visual_paths)
+
         return paths
 
     def export_all(
@@ -236,6 +242,317 @@ class PredictionExporter:
         except Exception as exc:
             _LOGGER.warning("PredictionExporter: PNG save failed: %s", exc)
             return None
+
+
+    def _save_visual_products(
+        self,
+        pred: SamplePrediction,
+        sid: str,
+    ) -> list[str]:
+        """
+        Export presentation-ready segmentation products.
+
+        Products:
+            *_color.png       class-colored prediction
+            *_source_rgb.png  RGB preview of source patch
+            *_overlay.png     prediction blended over source
+            *_comparison.png  source, prediction, and overlay
+        """
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            _LOGGER.warning(
+                "PredictionExporter: Pillow unavailable; "
+                "visual products skipped."
+            )
+            return []
+
+        palette = np.asarray(
+            [
+                [128, 128, 128],  # background
+                [0, 119, 190],    # water
+                [255, 200, 87],   # sand
+                [34, 139, 34],    # vegetation
+            ],
+            dtype=np.uint8,
+        )
+
+        mask = np.asarray(
+            pred.predicted_mask,
+            dtype=np.int64,
+        )
+
+        safe_mask = np.clip(
+            mask,
+            0,
+            len(palette) - 1,
+        )
+
+        color = palette[safe_mask]
+        color_img = Image.fromarray(
+            color,
+            mode="RGB",
+        )
+
+        written: list[str] = []
+
+        color_path = self._out_dir / f"{sid}_color.png"
+
+        try:
+            color_img.save(color_path)
+            written.append(str(color_path))
+        except Exception as exc:
+            _LOGGER.warning(
+                "PredictionExporter: colored mask save failed: %s",
+                exc,
+            )
+
+        source = self._load_source_rgb(
+            pred.patch_path,
+            mask.shape,
+        )
+
+        if source is None:
+            _LOGGER.warning(
+                "PredictionExporter: source preview unavailable "
+                "for sample %s.",
+                pred.sample_id,
+            )
+            return written
+
+        source_img = Image.fromarray(
+            source,
+            mode="RGB",
+        )
+
+        source_path = (
+            self._out_dir /
+            f"{sid}_source_rgb.png"
+        )
+
+        try:
+            source_img.save(source_path)
+            written.append(str(source_path))
+        except Exception as exc:
+            _LOGGER.warning(
+                "PredictionExporter: source preview save failed: %s",
+                exc,
+            )
+
+        overlay = (
+            source.astype(np.float32) * 0.50
+            + color.astype(np.float32) * 0.50
+        )
+
+        overlay = np.clip(
+            overlay,
+            0,
+            255,
+        ).astype(np.uint8)
+
+        overlay_img = Image.fromarray(
+            overlay,
+            mode="RGB",
+        )
+
+        overlay_path = (
+            self._out_dir /
+            f"{sid}_overlay.png"
+        )
+
+        try:
+            overlay_img.save(overlay_path)
+            written.append(str(overlay_path))
+        except Exception as exc:
+            _LOGGER.warning(
+                "PredictionExporter: overlay save failed: %s",
+                exc,
+            )
+
+        width, height = source_img.size
+        header_height = 42
+
+        comparison = Image.new(
+            "RGB",
+            (
+                width * 3,
+                height + header_height,
+            ),
+            "white",
+        )
+
+        comparison.paste(
+            source_img,
+            (0, header_height),
+        )
+
+        comparison.paste(
+            color_img,
+            (width, header_height),
+        )
+
+        comparison.paste(
+            overlay_img,
+            (width * 2, header_height),
+        )
+
+        draw = ImageDraw.Draw(comparison)
+
+        draw.text(
+            (10, 12),
+            "SOURCE RGB",
+            fill="black",
+        )
+
+        draw.text(
+            (width + 10, 12),
+            "PREDICTED CLASSES",
+            fill="black",
+        )
+
+        draw.text(
+            (width * 2 + 10, 12),
+            "SEGMENTATION OVERLAY",
+            fill="black",
+        )
+
+        comparison_path = (
+            self._out_dir /
+            f"{sid}_comparison.png"
+        )
+
+        try:
+            comparison.save(comparison_path)
+            written.append(str(comparison_path))
+        except Exception as exc:
+            _LOGGER.warning(
+                "PredictionExporter: comparison save failed: %s",
+                exc,
+            )
+
+        return written
+
+    @staticmethod
+    def _load_source_rgb(
+        patch_path: str,
+        target_shape: tuple[int, int],
+    ) -> np.ndarray | None:
+        """
+        Read an RGB preview from a multispectral source patch.
+
+        The first three source bands are used for the preview. Each band
+        receives robust percentile stretching so reflectance data becomes
+        visible in an ordinary 8-bit PNG.
+        """
+        if not patch_path:
+            return None
+
+        path = Path(patch_path)
+
+        if not path.is_file():
+            return None
+
+        try:
+            import rasterio
+
+            with rasterio.open(path) as src:
+                count = min(3, src.count)
+
+                if count < 1:
+                    return None
+
+                bands = src.read(
+                    list(range(1, count + 1))
+                ).astype(np.float32)
+
+        except Exception as exc:
+            _LOGGER.warning(
+                "PredictionExporter: source patch read failed "
+                "for %s: %s",
+                patch_path,
+                exc,
+            )
+            return None
+
+        if bands.shape[0] == 1:
+            bands = np.repeat(
+                bands,
+                3,
+                axis=0,
+            )
+        elif bands.shape[0] == 2:
+            bands = np.concatenate(
+                [bands, bands[-1:]],
+                axis=0,
+            )
+
+        rgb = np.zeros(
+            (
+                bands.shape[1],
+                bands.shape[2],
+                3,
+            ),
+            dtype=np.uint8,
+        )
+
+        for channel in range(3):
+            band = bands[channel]
+
+            valid = band[
+                np.isfinite(band)
+            ]
+
+            if valid.size == 0:
+                continue
+
+            low, high = np.percentile(
+                valid,
+                [2.0, 98.0],
+            )
+
+            if high <= low:
+                high = low + 1.0
+
+            stretched = (
+                (band - low)
+                / (high - low)
+            )
+
+            stretched = np.nan_to_num(
+                stretched,
+                nan=0.0,
+                posinf=1.0,
+                neginf=0.0,
+            )
+
+            rgb[:, :, channel] = (
+                np.clip(
+                    stretched,
+                    0.0,
+                    1.0,
+                )
+                * 255.0
+            ).astype(np.uint8)
+
+        expected_h, expected_w = target_shape
+
+        if rgb.shape[:2] != (
+            expected_h,
+            expected_w,
+        ):
+            from PIL import Image
+
+            rgb = np.asarray(
+                Image.fromarray(rgb).resize(
+                    (
+                        expected_w,
+                        expected_h,
+                    ),
+                    resample=Image.Resampling.BILINEAR,
+                )
+            )
+
+        return rgb
 
 
 def _sanitise(sid: str) -> str:

@@ -159,8 +159,21 @@ class TestSavePng:
         cfg  = _cfg(output_dir=str(tmp_path), export_png=True)
         exp  = PredictionExporter(cfg, CLASS_NAMES)
         paths = exp.export(_sp())
-        png_paths = [p for p in paths if p.endswith(".png")]
-        assert len(png_paths) == 1
+        png_paths = [
+            path
+            for path in paths
+            if path.endswith(".png")
+        ]
+
+        assert len(png_paths) == 2
+        assert any(
+            path.endswith("_mask.png")
+            for path in png_paths
+        )
+        assert any(
+            path.endswith("_color.png")
+            for path in png_paths
+        )
 
 
 # ==============================================================================
