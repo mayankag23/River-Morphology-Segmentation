@@ -45,3 +45,8 @@ outputs/visualizations/
 
 # Local pipeline run logs
 *.log
+
+# Local verification evidence
+verification_bundle/
+river_morphology_verified_results.tar.gz
+river_morphology_verified_results.tar.gz.sha256
