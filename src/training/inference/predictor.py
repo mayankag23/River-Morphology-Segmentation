@@ -54,6 +54,7 @@ class Predictor:
         self,
         images:   Any,
         metadata: list[dict] | None = None,
+        sample_offset: int = 0,
     ) -> list[SamplePrediction]:
         """
         Run inference on a batch of images.
@@ -104,7 +105,10 @@ class Predictor:
             meta     = (metadata[i] if metadata else {}) or {}
 
             sample = SamplePrediction(
-                sample_id          = str(meta.get("sample_id",         f"sample_{i}")),
+                sample_id          = str(
+                    meta.get("sample_id")
+                    or f"sample_{sample_offset + i}"
+                ),
                 predicted_mask     = preds_np[i],
                 probabilities      = probs_np[i],
                 confidence         = conf_map,
@@ -178,7 +182,11 @@ class Predictor:
                 images     = batch[0]
                 meta_dicts = [{}] * images.shape[0]
 
-            preds = self.predict_batch(images, meta_dicts)
+            preds = self.predict_batch(
+                images,
+                meta_dicts,
+                sample_offset=len(all_predictions),
+            )
             all_predictions.extend(preds)
 
         return all_predictions

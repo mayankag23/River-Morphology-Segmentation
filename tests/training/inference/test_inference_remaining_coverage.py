@@ -313,6 +313,36 @@ class TestPredictorAdditional:
         assert results[0].sample_id == "sample_0"
         assert results[1].sample_id == "sample_1"
 
+
+    def test_predict_batch_sample_offset_keeps_fallback_ids_unique(self):
+        """Fallback IDs remain unique across multiple inference batches."""
+        torch = pytest.importorskip("torch")
+        predictor = _tiny_predictor()
+
+        first_batch = predictor.predict_batch(
+            torch.randn(2, 4, 8, 8),
+            metadata=None,
+            sample_offset=0,
+        )
+        second_batch = predictor.predict_batch(
+            torch.randn(2, 4, 8, 8),
+            metadata=None,
+            sample_offset=len(first_batch),
+        )
+
+        sample_ids = [
+            result.sample_id
+            for result in first_batch + second_batch
+        ]
+
+        assert sample_ids == [
+            "sample_0",
+            "sample_1",
+            "sample_2",
+            "sample_3",
+        ]
+        assert len(sample_ids) == len(set(sample_ids))
+
     def test_predict_batch_export_numpy_false_logits_is_none(self):
         """When export_numpy=False, logits field on SamplePrediction must be None."""
         torch = pytest.importorskip("torch")

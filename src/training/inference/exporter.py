@@ -95,9 +95,22 @@ class PredictionExporter:
         Mutates each SamplePrediction's exported_paths list in place and
         returns the same list (for chaining).
         """
-        for pred in predictions:
+        seen_ids: set[str] = set()
+
+        for index, pred in enumerate(predictions):
+            sid = _sanitise(pred.sample_id)
+
+            if sid in seen_ids:
+                raise ValueError(
+                    "PredictionExporter: duplicate sample_id would overwrite "
+                    f"existing artifacts: {pred.sample_id!r} "
+                    f"(prediction index {index})."
+                )
+
+            seen_ids.add(sid)
             paths = self.export(pred)
             pred.exported_paths.extend(paths)
+
         return predictions
 
     # ------------------------------------------------------------------

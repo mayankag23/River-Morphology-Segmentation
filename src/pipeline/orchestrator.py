@@ -868,12 +868,18 @@ class PipelineOrchestrator:
                 # Full mode consumes TrainingResult from M14. Standalone
                 # inference consumes ModelResult from M13. InferenceEngine
                 # restores the configured checkpoint in both cases.
+                from dataclasses import replace
+
                 from src.training.inference import (
                     InferenceConfig,
                     InferenceEngine,
                 )
 
                 inf_cfg = InferenceConfig.from_config(config)
+                inf_cfg = replace(
+                    inf_cfg,
+                    output_dir=str(Path(out_dir) / "predictions"),
+                )
                 engine = InferenceEngine(inf_cfg)
 
                 inference_input = (
