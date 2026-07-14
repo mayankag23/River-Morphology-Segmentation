@@ -824,7 +824,19 @@ class PipelineOrchestrator:
                 from src.training.inference import InferenceConfig
                 from src.training.inference.loader import CheckpointLoader
 
+                from dataclasses import replace
+
                 eval_cfg = EvaluationConfig.from_config(config)
+
+                evaluation_dir = Path(out_dir) / "evaluation"
+
+                eval_cfg = replace(
+                    eval_cfg,
+                    output_dir=str(evaluation_dir),
+                    save_json=True,
+                    save_csv=True,
+                )
+
                 engine = EvaluationEngine(eval_cfg)
 
                 evaluation_input = stage_state.get("training")
@@ -868,7 +880,6 @@ class PipelineOrchestrator:
                 # Full mode consumes TrainingResult from M14. Standalone
                 # inference consumes ModelResult from M13. InferenceEngine
                 # restores the configured checkpoint in both cases.
-                from dataclasses import replace
 
                 from src.training.inference import (
                     InferenceConfig,
