@@ -138,10 +138,18 @@ class TestAugmentedDataset:
         ds = self._make(7)
         assert len(ds) == 7
 
-    def test_getitem_returns_two_elements(self) -> None:
+    def test_getitem_returns_image_mask_and_metadata(self) -> None:
         ds = self._make()
         item = ds[0]
-        assert len(item) == 2
+
+        assert len(item) == 3
+
+        image, mask, metadata = item
+
+        assert image is not None
+        assert mask is not None
+        assert isinstance(metadata, dict)
+        assert metadata["sample_id"] == "p_0000"
 
     def test_split_property(self) -> None:
         ds = self._make()

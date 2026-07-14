@@ -23,6 +23,48 @@ __all__ = ["Predictor"]
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+def _to_dict(value: Any) -> dict[str, Any]:
+    """
+    Convert supported metadata objects to a dictionary.
+
+    Dictionaries are returned unchanged. Dataclasses are converted with
+    asdict(). Compatible duck-typed metadata objects are read from their
+    known public attributes.
+    """
+    if value is None:
+        return {}
+
+    if isinstance(value, dict):
+        return value
+
+    if hasattr(value, "__dataclass_fields__"):
+        from dataclasses import asdict
+        return asdict(value)
+
+    fields = (
+        "sample_id",
+        "acquisition_date",
+        "season",
+        "hydrological_year",
+        "sensor",
+        "aoi_id",
+        "river_name",
+        "reach_id",
+        "basin_id",
+        "patch_path",
+        "mask_path",
+        "scene_id",
+        "year",
+        "month",
+    )
+
+    return {
+        field: getattr(value, field)
+        for field in fields
+        if hasattr(value, field)
+    }
+
+
 class Predictor:
     """
     Runs model inference and converts logits to SamplePrediction objects.
@@ -158,55 +200,97 @@ class Predictor:
         """
         Run inference over an entire DataLoader.
 
-        Args:
-            dataloader: torch.utils.data.DataLoader yielding
-                        (images, masks, metadata_list) or (images, masks).
+        Supports batches containing:
+            (images, masks)
+            (images, masks, list[dict])
+            (images, masks, dict[str, batched values])
 
-        Returns:
-            List of SamplePrediction for all samples.
+        PyTorch default_collate converts per-sample metadata dictionaries
+        into a dictionary whose values are batched. This method converts
+        that representation back into one dictionary per sample.
         """
         import torch
 
         all_predictions: list[SamplePrediction] = []
         self._model.eval()
 
-        for batch in dataloader:
-            if len(batch) >= 3:
-                images, _, meta_list = batch[0], batch[1], batch[2]
-                # meta_list may be a list of SampleMetadata or a dict.
-                if hasattr(meta_list, "__iter__") and not isinstance(meta_list, dict):
-                    meta_dicts = [_to_dict(m) for m in meta_list]
-                else:
-                    meta_dicts = [{}] * images.shape[0]
-            else:
-                images     = batch[0]
-                meta_dicts = [{}] * images.shape[0]
+        sample_offset = 0
 
-            preds = self.predict_batch(
-                images,
-                meta_dicts,
-                sample_offset=len(all_predictions),
-            )
-            all_predictions.extend(preds)
+        for batch in dataloader:
+            images = batch[0]
+            batch_size = int(images.shape[0])
+
+            metadata: list[dict[str, Any]] | None = None
+
+            if len(batch) >= 3:
+                candidate = batch[2]
+
+                if isinstance(candidate, dict):
+                    metadata = []
+
+                    for sample_index in range(batch_size):
+                        sample_metadata: dict[str, Any] = {}
+
+                        for key, values in candidate.items():
+                            try:
+                                value = values[sample_index]
+                            except (
+                                IndexError,
+                                KeyError,
+                                TypeError,
+                            ):
+                                value = values
+
+                            if hasattr(value, "item"):
+                                try:
+                                    value = value.item()
+                                except (
+                                    RuntimeError,
+                                    TypeError,
+                                    ValueError,
+                                ):
+                                    pass
+
+                            sample_metadata[str(key)] = value
+
+                        metadata.append(sample_metadata)
+
+                elif (
+                    isinstance(candidate, (list, tuple))
+                    and len(candidate) == batch_size
+                    and all(
+                        isinstance(item, dict)
+                        for item in candidate
+                    )
+                ):
+                    metadata = [
+                        dict(item)
+                        for item in candidate
+                    ]
+
+            if metadata is None:
+                metadata = [
+                    {
+                        "sample_id": (
+                            f"sample_{sample_offset + sample_index}"
+                        )
+                    }
+                    for sample_index in range(batch_size)
+                ]
+            else:
+                for sample_index, sample_metadata in enumerate(metadata):
+                    sample_metadata.setdefault(
+                        "sample_id",
+                        f"sample_{sample_offset + sample_index}",
+                    )
+
+            with torch.no_grad():
+                batch_predictions = self.predict_batch(
+                    images,
+                    metadata=metadata,
+                )
+
+            all_predictions.extend(batch_predictions)
+            sample_offset += batch_size
 
         return all_predictions
-
-
-def _to_dict(meta: Any) -> dict:
-    """Convert SampleMetadata or dict to a plain dict."""
-    if isinstance(meta, dict):
-        return meta
-    try:
-        import dataclasses
-        if dataclasses.is_dataclass(meta):
-            return dataclasses.asdict(meta)
-    except (ImportError, TypeError):
-        pass
-    # Best-effort attribute extraction.
-    return {
-        k: getattr(meta, k, "")
-        for k in ("sample_id", "acquisition_date", "season", "hydrological_year",
-                  "sensor", "aoi_id", "river_name", "reach_id", "basin_id",
-                  "patch_path", "mask_path", "scene_id", "year", "month")
-        if hasattr(meta, k)
-    }

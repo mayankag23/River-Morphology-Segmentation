@@ -223,7 +223,7 @@ class AugmentedDataset:
         image_out = _to_torch_float32(sample.image)
         mask_out  = _to_torch_long(sample.mask)
 
-        return image_out, mask_out
+        return image_out, mask_out, sample.metadata
 
     @property
     def transform(self) -> ComposedTransform:
