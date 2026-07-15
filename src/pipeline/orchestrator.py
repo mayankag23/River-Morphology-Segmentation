@@ -514,11 +514,24 @@ class PipelineOrchestrator:
                 # Module 4: LandsatCollectionBuilder → CollectionResult
                 from src.gee.collections import LandsatCollectionBuilder
                 client = stage_state.get("gee_client")
+                import ee
+
+                geometry = ee.Geometry.Rectangle(
+                    [
+                        float(aoi.min_lon),
+                        float(aoi.min_lat),
+                        float(aoi.max_lon),
+                        float(aoi.max_lat),
+                    ]
+                )
+
                 result = (
                     LandsatCollectionBuilder(client, config)
-                    .with_aoi_from_config()
+                    .with_aoi(geometry)
                     .with_date_range_from_config()
-                    .with_cloud_cover(config.satellite.max_cloud_cover_percent)
+                    .with_cloud_cover(
+                        config.satellite.max_cloud_cover_percent
+                    )
                     .with_auto_sensors()
                     .build()
                 )
@@ -590,9 +603,15 @@ class PipelineOrchestrator:
                     client=client,
                     config=config,
                 )
+                aoi_processed_dir = (
+                    Path(config.paths.processed_dir)
+                    / "aois"
+                    / aoi.aoi_id
+                )
+
                 result = exporter.export(
                     feature_stack_result=feature_stack_result,
-                    output_dir=Path(config.paths.processed_dir),
+                    output_dir=aoi_processed_dir,
                 )
                 stage_state["export"] = result
             return fn
@@ -606,10 +625,14 @@ class PipelineOrchestrator:
                 export_result = stage_state.get("export")
                 from pathlib import Path
                 generator = PatchGenerator(config)
-                # result    = generator.generate(export_result, Path(config.paths.patches_dir ))
+                aoi_patches_dir = (
+                    Path(config.paths.patches_dir)
+                    / aoi.aoi_id
+                )
+
                 result = generator.generate(
                     export_result,
-                    config.paths.patches_dir,
+                    aoi_patches_dir,
                 )
                 stage_state["patches"] = result
             return fn

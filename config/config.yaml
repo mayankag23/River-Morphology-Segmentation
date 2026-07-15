@@ -94,15 +94,11 @@ gee:
 #   min_lat: null    # Southern boundary (latitude),  e.g. 26.0
 #   max_lon: null    # Eastern boundary (longitude),  e.g. 87.5
 #   max_lat: null    # Northern boundary (latitude),  e.g. 26.5
+# Global AOI validation settings.
+# River coordinates are defined in `aois:` below.
 aoi:
-  min_lon: 87.0
-  min_lat: 26.0
-  max_lon: 87.5
-  max_lat: 26.5
-  # Safety limit: AOIs wider than this may span multiple UTM zones, causing
-  # spatial distortion in downloaded imagery. A warning is raised if exceeded.
+  # Safety limit for AOI width.
   max_width_degrees: 3.0
-
 
 # ------------------------------------------------------------------------------
 # Date Range for Imagery Compositing
@@ -833,8 +829,50 @@ pipeline:
 
 # Optional multi-AOI batch:
 aois:
-  - id: "kosi"
-    min_lon: 87.0
-    min_lat: 26.0
-    max_lon: 87.5
-    max_lat: 26.5
+  - id: "mp_demo"
+    min_lon: 76.20395
+    min_lat: 25.61608
+    max_lon: 76.25099
+    max_lat: 25.65535
+
+  - id: "ganga_patna"
+    min_lon: 85.09
+    min_lat: 25.62
+    max_lon: 85.16
+    max_lat: 25.69
+
+  - id: "chambal_kota"
+    min_lon: 75.82
+    min_lat: 25.15
+    max_lon: 75.90
+    max_lat: 25.21
+
+  - id: "yamuna_agra"
+    min_lon: 78.00
+    min_lat: 27.16
+    max_lon: 78.08
+    max_lat: 27.22
+
+  - id: "brahmaputra_tezpur"
+    min_lon: 92.80
+    min_lat: 26.55
+    max_lon: 92.95
+    max_lat: 26.70
+
+  - id: "kosi_bihar"
+    min_lon: 86.90
+    min_lat: 25.85
+    max_lon: 87.05
+    max_lat: 26.00
+
+  - id: "godavari_raj"
+    min_lon: 81.72
+    min_lat: 16.95
+    max_lon: 81.87
+    max_lat: 17.08
+
+  - id: "mahanadi_odisha"
+    min_lon: 84.30
+    min_lat: 20.28
+    max_lon: 84.45
+    max_lat: 20.42
