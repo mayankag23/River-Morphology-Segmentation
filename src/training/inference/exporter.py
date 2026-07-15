@@ -440,9 +440,10 @@ class PredictionExporter:
         """
         Read an RGB preview from a multispectral source patch.
 
-        The first three source bands are used for the preview. Each band
-        receives robust percentile stretching so reflectance data becomes
-        visible in an ordinary 8-bit PNG.
+        The harmonized Red, Green, and Blue source bands are read in
+        natural-color RGB order. Each band receives robust percentile
+        stretching so reflectance data becomes visible in an ordinary
+        8-bit PNG.
         """
         if not patch_path:
             return None
@@ -456,13 +457,18 @@ class PredictionExporter:
             import rasterio
 
             with rasterio.open(path) as src:
-                count = min(3, src.count)
-
-                if count < 1:
+                if src.count < 3:
                     return None
 
+                # Harmonized Landsat source order:
+                # band 1 = Blue
+                # band 2 = Green
+                # band 3 = Red
+                #
+                # RGB display order must therefore be:
+                # Red, Green, Blue -> 3, 2, 1.
                 bands = src.read(
-                    list(range(1, count + 1))
+                    [3, 2, 1]
                 ).astype(np.float32)
 
         except Exception as exc:
