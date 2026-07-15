@@ -867,11 +867,8 @@ class PipelineOrchestrator:
                 result = engine.evaluate(
                     evaluation_input,
                     data_result,
-                    class_names=(
-                        "background",
-                        "water",
-                        "sand",
-                        "vegetation",
+                    class_names=tuple(
+                        config.classes.names
                     ),
                 )
                 stage_state["evaluation"] = result
