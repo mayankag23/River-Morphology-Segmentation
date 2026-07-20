@@ -301,33 +301,64 @@ class LandsatPreprocessor:
     # Private pipeline stages
     # ------------------------------------------------------------------
 
+    # def _apply_scaling(self, collection: Any) -> Any:
+    #     """
+    #     Apply USGS Collection 2 Level-2 radiometric scale factors.
+
+    #     Maps _make_scale_function() over every image in the collection.
+    #     The function operates on:
+    #         SR_B.* bands: multiply by sr_scale_factor, add sr_offset.
+    #         ST_B.* bands: multiply by thermal_scale_factor, add thermal_offset.
+    #         QA_PIXEL:     preserved unchanged (no scaling applied).
+
+    #     Args:
+    #         collection: An ee.ImageCollection with unscaled DN values.
+
+    #     Returns:
+    #         The same collection with physical reflectance/temperature values.
+
+    #     Raises:
+    #         GEENotInstalledError: earthengine-api is not installed.
+    #         GEEAPIError:          collection.map() failed.
+    #     """
+    #     scale_fn = self._make_scale_function()
+    #     try:
+    #         return collection.map(scale_fn)
+    #     except Exception as exc:
+    #         raise GEEAPIError(
+    #             operation="apply_scaling",
+    #             reason=f"collection.map() for scaling failed: {exc}",
+    #         ) from exc
+
     def _apply_scaling(self, collection: Any) -> Any:
         """
-        Apply USGS Collection 2 Level-2 radiometric scale factors.
+        Apply radiometric scaling.
 
-        Maps _make_scale_function() over every image in the collection.
-        The function operates on:
-            SR_B.* bands: multiply by sr_scale_factor, add sr_offset.
-            ST_B.* bands: multiply by thermal_scale_factor, add thermal_offset.
-            QA_PIXEL:     preserved unchanged (no scaling applied).
+        Landsat:
+            Apply USGS scale factors.
 
-        Args:
-            collection: An ee.ImageCollection with unscaled DN values.
-
-        Returns:
-            The same collection with physical reflectance/temperature values.
-
-        Raises:
-            GEENotInstalledError: earthengine-api is not installed.
-            GEEAPIError:          collection.map() failed.
+        Sentinel-2:
+            Images are already reflectance products.
         """
+
+        if (
+            "COPERNICUS/S2_SR_HARMONIZED"
+            in self._config.satellite.collections
+        ):
+            self._logger.info(
+                "Sentinel-2 detected: skipping Landsat scaling."
+            )
+            return collection
+
         scale_fn = self._make_scale_function()
+
         try:
             return collection.map(scale_fn)
+
         except Exception as exc:
             raise GEEAPIError(
                 operation="apply_scaling",
-                reason=f"collection.map() for scaling failed: {exc}",
+                reason=f"collection.map() failed: {exc}",
             ) from exc
 
     def _make_scale_function(self) -> Any:
@@ -396,22 +427,38 @@ class LandsatPreprocessor:
 
         return _scale_image
 
+    # def _apply_masking(self, collection: Any) -> Any:
+    #     """
+    #     Apply QA_PIXEL masking to the collection using LandsatQAMasker.
+
+    #     Delegates to self._masker.apply_to_collection() which applies
+    #     the configured mask flags via collection.map().
+
+    #     Args:
+    #         collection: An ee.ImageCollection (scaled or unscaled).
+
+    #     Returns:
+    #         The collection with masked pixels set to nodata.
+
+    #     Raises:
+    #         GEEAPIError: apply_to_collection() raised.
+    #     """
+    #     return self._masker.apply_to_collection(collection)
+
     def _apply_masking(self, collection: Any) -> Any:
         """
-        Apply QA_PIXEL masking to the collection using LandsatQAMasker.
-
-        Delegates to self._masker.apply_to_collection() which applies
-        the configured mask flags via collection.map().
-
-        Args:
-            collection: An ee.ImageCollection (scaled or unscaled).
-
-        Returns:
-            The collection with masked pixels set to nodata.
-
-        Raises:
-            GEEAPIError: apply_to_collection() raised.
+        Apply QA masking.
         """
+
+        if (
+            "COPERNICUS/S2_SR_HARMONIZED"
+            in self._config.satellite.collections
+        ):
+            self._logger.info(
+                "Sentinel-2 detected: skipping Landsat QA masking."
+            )
+            return collection
+
         return self._masker.apply_to_collection(collection)
 
     def _apply_harmonization(self, collection: Any) -> Any:

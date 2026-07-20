@@ -62,6 +62,8 @@ from src.pipeline.contracts import (
 from src.pipeline.factory import PipelineFactory
 from src.pipeline.runner import StageRunner
 from src.pipeline.validator import PipelineValidator
+from dataclasses import replace
+
 
 __all__ = ["PipelineOrchestrator"]
 
@@ -97,9 +99,19 @@ _STAGE_ORDER: dict[str, tuple[str, ...]] = {
     # evaluation mode: load data → augment → build model → train → evaluate
     "evaluation":    ("dataloader", "transforms", "model", "evaluation"),
     # remaining modes are single-stage; they read from checkpoint/disk
-    "inference":     (
+    "inference": (
         "dataloader",
         "transforms",
+        "model",
+        "inference",
+    ),
+    "deployment":     (
+        "bootstrap",
+        "gee_client",
+        "collection",
+        "preprocessing",
+        "features",
+        "export",
         "model",
         "inference",
     ),
@@ -128,6 +140,7 @@ _STAGE_ORDER: dict[str, tuple[str, ...]] = {
         "visualization",
         "reporting",
     ),
+
 }
 
 
@@ -224,6 +237,8 @@ class PipelineOrchestrator:
                 ),
                 None,
             )
+               
+            # Deployment mode runs all stages for each AOI, then runs the global stages once.
 
             if split_index is not None:
                 aoi_stages = stages[:split_index]
@@ -281,7 +296,11 @@ class PipelineOrchestrator:
                 None,
             )
 
-            if split_index is not None:
+            if self._pipeline_config.mode == "deployment":
+                aoi_stages = stages
+                global_stages = ()
+
+            elif split_index is not None:
                 aoi_stages = stages[:split_index]
                 global_stages = stages[split_index:]
             else:
@@ -609,10 +628,49 @@ class PipelineOrchestrator:
                     / aoi.aoi_id
                 )
 
-                result = exporter.export(
-                    feature_stack_result=feature_stack_result,
-                    output_dir=aoi_processed_dir,
+                # DatasetExporter currently reads config.aoi.
+                # Temporarily bind the active named AOI to both Config
+                # representations, then restore the global settings.
+                from src.core.config import ConfigNode
+
+                original_raw_aoi = dict(
+                    config._raw_data.get(
+                        "aoi",
+                        {},
+                    )
                 )
+                original_node_aoi = config._node.aoi
+
+                active_aoi = {
+                    "min_lon": float(aoi.min_lon),
+                    "min_lat": float(aoi.min_lat),
+                    "max_lon": float(aoi.max_lon),
+                    "max_lat": float(aoi.max_lat),
+                    "max_width_degrees": float(
+                        original_raw_aoi.get(
+                            "max_width_degrees",
+                            3.0,
+                        )
+                    ),
+                }
+
+                try:
+                    config._raw_data["aoi"] = active_aoi
+                    config._node.aoi = ConfigNode(
+                        active_aoi
+                    )
+
+                    result = exporter.export(
+                        feature_stack_result=feature_stack_result,
+                        output_dir=aoi_processed_dir,
+                    )
+                finally:
+                    config._raw_data["aoi"] = (
+                        original_raw_aoi
+                    )
+                    config._node.aoi = (
+                        original_node_aoi
+                    )
                 stage_state["export"] = result
             return fn
 
@@ -917,7 +975,28 @@ class PipelineOrchestrator:
                     inf_cfg,
                     output_dir=str(Path(out_dir) / "predictions"),
                 )
-                engine = InferenceEngine(inf_cfg)
+                config.inference.output_dir = str(Path(out_dir) / "predictions")
+                engine = InferenceEngine(config)
+
+                # ------------------------------------------------------------------
+                # AOI inference
+                # ------------------------------------------------------------------
+                export_result = stage_state.get("export")
+
+                if export_result is not None:
+                    # raster_path = export_result.image_path 
+
+                    result = engine.predict_aoi(
+                        raster_path=str(export_result.image_path),
+                        output_dir=str(Path(out_dir) / "predictions"),
+                    )
+
+                    stage_state["inference"] = result
+                    return [str(Path(out_dir) / "predictions")]
+
+                # ------------------------------------------------------------------
+                # Existing dataset inference (fallback)
+                # ------------------------------------------------------------------
 
                 inference_input = (
                     stage_state.get("training")
@@ -925,17 +1004,12 @@ class PipelineOrchestrator:
                 )
                 data_result = stage_state.get("transforms")
 
-                if inference_input is None:
-                    raise RuntimeError(
-                        "Inference requires TrainingResult or ModelResult."
-                    )
-
                 result = engine.predict(
                     training_result=inference_input,
                     data_result=data_result,
                 )
                 stage_state["inference"] = result
-                return [str(Path(out_dir) / "inference")]
+                return [str(Path(out_dir) / "predictions")]
             return fn
 
         # ------------------------------------------------------------------ M17

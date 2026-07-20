@@ -43,7 +43,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from src.core.exceptions import InvalidValueError
-from src.gee import GEEAPIError
+# from src.gee import GEEAPIError
+from src.gee import (
+    GEEAPIError,
+    GEENotInstalledError,
+)
 
 if TYPE_CHECKING:
     from src.core.config import Config
@@ -222,6 +226,45 @@ class LandsatQAMasker:
                 operation="apply_qa_masking_to_collection",
                 reason=f"collection.map() for QA masking failed: {exc}",
             ) from exc
+        
+
+    def _mask_sentinel(
+        self,
+        image,
+    ):
+        """
+        Cloud masking for Sentinel-2 using the Scene
+        Classification Layer (SCL).
+
+        Removes:
+            3  = Cloud Shadow
+            8  = Medium Probability Cloud
+            9  = High Probability Cloud
+            10 = Thin Cirrus
+            11 = Snow / Ice
+        """
+
+        try:
+            import ee
+
+        except ImportError as exc:
+            raise GEENotInstalledError(
+                "earthengine-api is not installed."
+            ) from exc
+
+        scl = image.select("QA")
+
+        mask = (
+            scl.neq(3)
+            .And(scl.neq(8))
+            .And(scl.neq(9))
+            .And(scl.neq(10))
+            .And(scl.neq(11))
+        )
+
+        return image.updateMask(mask)
+
+
 
     def apply_to_image(self, image: Any) -> Any:
         """
@@ -240,14 +283,52 @@ class LandsatQAMasker:
         Raises:
             GEEAPIError: The masking computation raised an EE exception.
         """
+        # try:
+        #     good_pixel_mask = self._build_qa_mask(image)
+        #     return image.updateMask(good_pixel_mask)
+        # except Exception as exc:
+        #     raise GEEAPIError(
+        #         operation="apply_qa_masking_to_image",
+        #         reason=f"QA mask construction or updateMask() failed: {exc}",
+        #     ) from exc
+
         try:
-            good_pixel_mask = self._build_qa_mask(image)
-            return image.updateMask(good_pixel_mask)
-        except Exception as exc:
-            raise GEEAPIError(
-                operation="apply_qa_masking_to_image",
-                reason=f"QA mask construction or updateMask() failed: {exc}",
+            import ee
+
+        except ImportError as exc:
+            raise GEENotInstalledError(
+                "earthengine-api is not installed."
             ) from exc
+
+        # spacecraft = ee.String(
+        #     image.get("SPACECRAFT_ID")
+        # )
+
+        # is_s2 = spacecraft.equals(
+        #     "SENTINEL_2"
+        # )
+        spacecraft = ee.String(
+            ee.Algorithms.If(
+            image.propertyNames().contains("SPACECRAFT_ID"),
+            image.get("SPACECRAFT_ID"),
+            image.get("SPACECRAFT_NAME"),
+            )
+        )           
+
+        is_s2 = spacecraft.match("^Sentinel-2.*")
+
+        return ee.Image(
+
+        ee.Algorithms.If(
+            is_s2,
+            self._mask_sentinel(image),
+            # self._mask_landsat(image),
+            image.updateMask(
+                self._build_qa_mask(image)
+            ),
+        )
+    )
+
 
     def _build_qa_mask(self, image: Any) -> Any:
         """

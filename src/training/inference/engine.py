@@ -30,6 +30,7 @@ import logging
 import time
 from typing import Any
 
+from pathlib import Path
 import numpy as np
 
 from src.training.inference.contracts import (
@@ -55,12 +56,22 @@ class InferenceEngine:
     """
 
     def __init__(self, config: Any) -> None:
+        # if isinstance(config, InferenceConfig):
+        #     self._config = config
+        # else:
+        #     self._config = InferenceConfig.from_config(config)
+        # self._validator = InferenceValidator()
+        # self._logger    = _LOGGER
+        # Keep the original project config
+        self._project_config = config
+
         if isinstance(config, InferenceConfig):
             self._config = config
         else:
             self._config = InferenceConfig.from_config(config)
+
         self._validator = InferenceValidator()
-        self._logger    = _LOGGER
+        self._logger = _LOGGER
 
     def predict(
         self,
@@ -240,3 +251,30 @@ class InferenceEngine:
             for i, name in enumerate(class_names):
                 counts[name] += int((mask == i).sum())
         return counts
+    
+    def predict_aoi(
+        self,
+        raster_path: str,
+        output_dir: str,
+    ):
+        """
+        Run inference on a complete GeoTIFF AOI.
+        """
+
+        from src.deployment.predictor import AOIPredictor
+
+        # predictor = AOIPredictor(
+        #     config=self._config,
+        #     model=resolved_model,
+        # )
+        predictor = AOIPredictor(self._project_config)
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        predictor.save_prediction(
+            raster_path=raster_path,
+            output_png=output_dir / "prediction.png",
+        )
+
+        return output_dir    

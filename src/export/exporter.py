@@ -238,6 +238,20 @@ class DatasetExporter:
             scene_id, len(band_names), scale,
         )
 
+
+        print("=" * 80)
+        print("EE IMAGE BANDS")
+        print(feature_stack_result.image.bandNames().getInfo())
+        print()
+
+        print("FEATURE STACK BAND NAMES")
+        print(feature_stack_result.all_band_names)
+        print()
+
+        print("NUMBER OF EE BANDS")
+        print(feature_stack_result.image.bandNames().size().getInfo())
+        print("=" * 80)
+
         download_result = self._downloader.download(
             image=feature_stack_result.image,
             aoi_bounds=aoi_bounds,

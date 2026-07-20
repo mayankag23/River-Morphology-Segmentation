@@ -120,19 +120,20 @@ date_range:
 # ------------------------------------------------------------------------------
 satellite:
   collections:
-    - "LANDSAT/LC08/C02/T1_L2"    # Landsat 8 OLI — operational since 2013
-    - "LANDSAT/LC09/C02/T1_L2"    # Landsat 9 OLI-2 — operational since 2021
+    # - "LANDSAT/LC08/C02/T1_L2"    # Landsat 8 OLI — operational since 2013
+    # - "LANDSAT/LC09/C02/T1_L2"    # Landsat 9 OLI-2 — operational since 2021
+    - COPERNICUS/S2_SR_HARMONIZED
 
   # Collection 2 Level-2 radiometric scaling: SR = DN × scale_factor + offset
-  scale_factor: 0.0000275
-  offset:       -0.2
+  scale_factor: 1.0   #0.0000275
+  offset:       0.0   #-0.2
 
   # Valid surface reflectance range after scaling (values outside are clipped)
   sr_min: 0.0
   sr_max: 1.0
 
   # Scenes with cloud cover above this threshold are excluded before compositing
-  max_cloud_cover_percent: 20
+  max_cloud_cover_percent: 10
 
   # QA_PIXEL band bit positions for cloud/shadow masking (Landsat C2 specification)
   qa_bits:
@@ -140,12 +141,12 @@ satellite:
     dilated_cloud: 1    # Dilated cloud (conservative cloud buffer)
     cirrus:        2    # Cirrus cloud
     cloud:         3    # Cloud
-    cloud_shadow:  4    # Cloud shadow
+    cloud_shadow:  4    # Cloud shadow  
     snow:          5    # Snow/ice
     clear:         6    # Clear pixel
     water:         7    # QA water flag (NOT used as our classification target)
 
-  resolution_meters: 30           # Native OLI spatial resolution for all bands used
+  resolution_meters: 10         # Native Sentinal-2 spatial resolution for all bands used
   output_crs:        "EPSG:4326"  # Output CRS; GEE handles reprojection automatically
 
 
@@ -294,11 +295,11 @@ label_generation:
 patch_generation:
   # Spatial size of each patch in pixels. Must be a power of 2.
   # 512 fits on a T4 (16 GB) GPU at batch_size=8 with 11 input channels.
-  patch_size: 256 #512
+  patch_size: 128
 
   # Stride for training patch extraction.
-  # 256 = 50% overlap → generates ~4× more patches than non-overlapping.
-  train_stride: 128 #256
+  # 64 = 50% overlap for 128-pixel patches.
+  train_stride: 64
 
   # Stride for inference patch extraction.
   # 50% overlap enables Gaussian-weighted blending to remove boundary artifacts.
@@ -469,7 +470,7 @@ augmentation:
 # Training Configuration
 # ------------------------------------------------------------------------------
 training:
-  num_epochs:  3 #100
+  num_epochs:  3  #100
   batch_size:  8     # Per-GPU; for T4 16 GB at patch_size=512 with 11 channels
 
   num_workers:  4    # Parallel data loading. Set to 0 on Windows if errors occur.
@@ -547,8 +548,8 @@ training:
 # Inference Configuration
 # ------------------------------------------------------------------------------
 inference:
-  patch_size:  256 #512    # Must match patch_generation.patch_size
-  stride:      256    # 50% overlap enables Gaussian-weighted tile blending
+  patch_size:  128    # Must match patch_generation.patch_size
+  stride:      64     # 50% overlap enables Gaussian-weighted tile blending
 
   # Sigma for Gaussian weight map used in tile blending.
   # 0.5 = tight bell; border pixels receive very low weight.
@@ -564,8 +565,8 @@ inference:
   checkpoint_dir:       "checkpoints"   # Where to look for checkpoints
   output_dir:           "predictions"   # Where predictions are written
   export_numpy:         true    # Write mask as .npy
-  export_geotiff:       false   # Write GeoTIFF (requires rasterio)
-  export_png:           false   # Write mask PNG
+  export_geotiff:       true   # Write GeoTIFF (requires rasterio)
+  export_png:           true  # Write mask PNG
 
 
 # ------------------------------------------------------------------------------
@@ -626,7 +627,7 @@ export:
   area_statistics:
     enabled:       true
     unit:          "km2"   # "m2", "km2", or "ha"
-    pixel_area_m2: 900     # 30 m × 30 m
+    pixel_area_m2: 100     #900     # 30 m × 30 m
   
   # Dataset manifest format(s) to generate
   manifest:
@@ -638,7 +639,9 @@ export:
   dataset_version:        "1.0.0"
   pipeline_version:       "1.0.0"
   feature_schema_version: "1.0.0"
-  landsat_collection:     "Landsat Collection 2 Level-2"
+  # landsat_collection:    # Sentinel-2 Surface Reflectance Harmonized
+  satellite_collection:
+    "COPERNICUS/S2_SR_HARMONIZED"
 
 
 # ------------------------------------------------------------------------------
@@ -876,3 +879,36 @@ aois:
     min_lat: 20.28
     max_lon: 84.45
     max_lat: 20.42
+  
+  - id: "ramganga_up"
+    min_lon: 79.38
+    min_lat: 28.19
+    max_lon: 79.43
+    max_lat: 28.24 
+   
+  - id: "mahi_chittor"
+    min_lon: 74.26
+    min_lat: 23.81
+    max_lon: 74.40
+    max_lat: 23.94
+
+  - id: "dudhi_mp"
+    min_lon: 78.57
+    min_lat: 22.68
+    max_lon: 78.70
+    max_lat: 22.82
+
+  - id: "bramhaputra_assam"
+    min_lon: 89.73
+    min_lat: 26.12
+    max_lon: 89.87
+    max_lat: 26.26
+
+  - id: "kunthi_kerela"
+    min_lon: 76.05
+    min_lat: 10.81
+    max_lon: 76.19
+    max_lat: 10.94
+
+
+

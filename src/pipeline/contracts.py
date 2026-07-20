@@ -27,6 +27,7 @@ VALID_MODES: tuple[str, ...] = (
     "training",
     "evaluation",
     "inference",
+    "deployment",
     "analysis",
     "visualization",
     "reporting",

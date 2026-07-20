@@ -33,6 +33,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+import rasterio
 
 import numpy as np
 
@@ -242,78 +243,164 @@ class EarthEngineDownloader:
     # ------------------------------------------------------------------
     # Public
     # ------------------------------------------------------------------
-
     def download(
         self,
-        image:       Any,
-        aoi_bounds:  AoiBounds,
-        band_names:  list[str],
+        image: Any,
+        aoi_bounds: AoiBounds,
+        band_names: list[str],
         scale_meters: float,
-        crs:         str,
+        crs: str,
     ) -> DownloadResult:
         """
         Download an ee.Image to a float32 numpy array.
-
-        Args:
-            image:        ee.Image (any ee.Image with the named bands present).
-            aoi_bounds:   Geographic extent to download.
-            band_names:   Ordered list of band names to request. Must match
-                          the actual band names in the image.
-            scale_meters: Pixel size in metres (30 for Landsat).
-            crs:          Output CRS string (e.g. "EPSG:4326").
-
-        Returns:
-            DownloadResult with array, CRS, AffineTransform, and band metadata.
-
-        Raises:
-            GEEAPIError: URL generation, HTTP download, or byte parsing failed.
         """
-        tiles    = self._compute_tiles(aoi_bounds, scale_meters)
-        total_w, total_h = self._estimate_dimensions(aoi_bounds, scale_meters)
-        n_bands  = len(band_names)
+
+        tiles = self._compute_tiles(aoi_bounds, scale_meters)
+
+        n_bands = len(band_names)
 
         self._logger.info(
-            "Downloading image. bands=%d, tiles=%d, scale=%gm, crs=%s",
-            n_bands, len(tiles), scale_meters, crs,
+            "Downloading image. bands=%d tiles=%d scale=%gm crs=%s",
+            n_bands,
+            len(tiles),
+            scale_meters,
+            crs,
         )
 
-        output        = np.full((n_bands, total_h, total_w), np.nan, dtype=np.float32)
-        out_transform: AffineTransform | None = None
-        out_crs:       str                    = crs
+        # ---------------------------------------------------------
+        # PASS 1
+        # Download every tile.
+        # Nothing is stitched yet.
+        # ---------------------------------------------------------
+
+        tile_records = []
+
+        out_transform = None
+        out_crs = crs
 
         for tile in tiles:
-            self._logger.debug("Processing %s", tile.tile_id)
+
+            self._logger.debug("Downloading %s", tile.tile_id)
+
             tile_data, tile_crs, tile_transform = self._download_tile(
-                image, tile, band_names, scale_meters, crs
+                image,
+                tile,
+                band_names,
+                scale_meters,
+                crs,
             )
 
             if out_transform is None:
                 out_transform = tile_transform
-                out_crs       = tile_crs
+                out_crs = tile_crs
 
-            col_off, row_off = self._pixel_offset(tile_transform, out_transform)
-            t_bands, th, tw  = tile_data.shape
+            row = int(tile.tile_id.split("_")[1])
+            col = int(tile.tile_id.split("_")[2])
 
-            r0 = max(0, row_off)
-            c0 = max(0, col_off)
-            r1 = min(total_h, row_off + th)
-            c1 = min(total_w, col_off + tw)
-
-            sr0 = r0 - row_off
-            sc0 = c0 - col_off
-            sr1 = sr0 + (r1 - r0)
-            sc1 = sc0 + (c1 - c0)
-
-            if r1 > r0 and c1 > c0:
-                output[:, r0:r1, c0:c1] = tile_data[:, sr0:sr1, sc0:sc1]
+            tile_records.append(
+                {
+                    "row": row,
+                    "col": col,
+                    "data": tile_data,
+                    "transform": tile_transform,
+                }
+            )
 
         if out_transform is None:
             raise GEEAPIError(
                 operation="download",
                 reason="No tiles were successfully downloaded.",
-            )
+            )   
 
-        _, actual_h, actual_w = output.shape
+        # ---------------------------------------------------------
+        # PASS 2
+        # Determine the true size of every row and column from the
+        # downloaded tiles.
+        # ---------------------------------------------------------
+
+        row_heights = {}
+        col_widths = {}
+
+        for rec in tile_records:
+            _, h, w = rec["data"].shape
+
+            row = rec["row"]
+            col = rec["col"]
+
+            row_heights[row] = max(row_heights.get(row, 0), h)
+            col_widths[col] = max(col_widths.get(col, 0), w)
+
+        n_rows = max(row_heights.keys()) + 1
+        n_cols = max(col_widths.keys()) + 1
+
+        total_h = sum(row_heights[r] for r in range(n_rows))
+        total_w = sum(col_widths[c] for c in range(n_cols))
+
+        output = np.full(
+            (n_bands, total_h, total_w),
+            np.nan,
+            dtype=np.float32,
+        )
+
+        #
+        # cumulative offsets
+        #
+
+        row_offsets = {}
+        running = 0
+
+        for r in reversed(range(n_rows)):
+            row_offsets[r] = running
+            running += row_heights[r]
+
+        col_offsets = {}
+        running = 0
+
+        for c in range(n_cols):
+            col_offsets[c] = running
+            running += col_widths[c]
+
+        # ---------------------------------------------------------
+        # PASS 3
+        # Stitch tiles into the output mosaic.
+        # ---------------------------------------------------------
+
+        for rec in tile_records:
+
+            tile_data = rec["data"]
+            row = rec["row"]
+            col = rec["col"]
+
+            _, th, tw = tile_data.shape
+
+            r0 = row_offsets[row]
+            c0 = col_offsets[col]
+
+            r1 = r0 + th
+            c1 = c0 + tw
+
+            output[:, r0:r1, c0:c1] = tile_data
+
+        # ---------------------------------------------------------
+        # Diagnostics
+        # ---------------------------------------------------------
+
+        rgb = output[[2, 1, 0]].transpose(1, 2, 0)
+        rgb = np.nan_to_num(rgb)
+
+        mn = rgb.min()
+        mx = rgb.max()
+
+        if mx > mn:
+            rgb = (rgb - mn) / (mx - mn)
+
+        from PIL import Image
+
+        Image.fromarray((rgb * 255).astype(np.uint8)).save("stitched.png")
+
+        actual_h = output.shape[1]
+        actual_w = output.shape[2]
+
         return DownloadResult(
             data=output,
             crs=out_crs,
@@ -322,8 +409,15 @@ class EarthEngineDownloader:
             width=actual_w,
             height=actual_h,
             aoi_bounds=aoi_bounds,
-            num_tiles=len(tiles),
+            num_tiles=len(tile_records),
         )
+
+
+
+
+
+
+
 
     # ------------------------------------------------------------------
     # Private — tiling
@@ -337,8 +431,11 @@ class EarthEngineDownloader:
         """Estimate (width_px, height_px) for the AOI at the given scale."""
         centre_lat = (aoi.min_lat + aoi.max_lat) / 2.0
         lon_scale  = math.cos(math.radians(centre_lat))
+
+
         width_m    = (aoi.max_lon - aoi.min_lon) * _METRES_PER_DEGREE_LAT * lon_scale
         height_m   = (aoi.max_lat - aoi.min_lat) * _METRES_PER_DEGREE_LAT
+
         return (
             max(1, int(round(width_m  / scale_meters))),
             max(1, int(round(height_m / scale_meters))),
@@ -371,6 +468,14 @@ class EarthEngineDownloader:
                     max_lat=min(aoi.max_lat, aoi.min_lat + (row + 1) * lat_step),
                 )
                 tiles.append(TileSpec(bounds=bounds, tile_id=f"tile_{row}_{col}"))
+                # print("=" * 60)
+                # print(f"Tile {row}, {col}")
+                # print("min_lon =", bounds.min_lon)
+                # print("max_lon =", bounds.max_lon)
+                # print("min_lat =", bounds.min_lat)
+                # print("max_lat =", bounds.max_lat)
+                # print("=" * 60)
+                
 
         self._logger.info(
             "AOI tiled: %d rows x %d cols = %d tiles.", n_rows, n_cols, len(tiles)
@@ -389,7 +494,7 @@ class EarthEngineDownloader:
         to integer pixel offsets in the output array.
         """
         col = int(round((tile_t.c - out_t.c) / out_t.a))
-        row = int(round((tile_t.f - out_t.f) / out_t.e))
+        row = int(round((tile_t.f - out_t.f) / abs(out_t.e)))
         return col, row
 
     # ------------------------------------------------------------------
@@ -474,6 +579,12 @@ class EarthEngineDownloader:
         try:
             with MemoryFile(data) as mf:
                 with mf.open() as ds:
+                    # print("=" * 60)
+                    # print("WIDTH :", ds.width)
+                    # print("HEIGHT:", ds.height)
+                    # print("BOUNDS:", ds.bounds)
+                    # print("TRANSFORM:", ds.transform)
+                    # print("=" * 60) 
                     arr       = ds.read().astype(np.float32)
                     crs_str   = ds.crs.to_string()
                     transform = AffineTransform.from_affine(ds.transform)

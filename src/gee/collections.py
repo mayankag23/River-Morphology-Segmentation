@@ -106,6 +106,8 @@ class LandsatSensor(str, Enum):
     L8 = "LANDSAT_8"
     L9 = "LANDSAT_9"
 
+    S2 = "SENTINEL_2"
+
 
 # ==============================================================================
 # Sensor availability periods
@@ -210,6 +212,19 @@ SENSOR_AVAILABILITY: tuple[SensorAvailabilityPeriod, ...] = (
             "Landsat 9 OLI-2/TIRS-2 C2 L2 (October 2021 - present). "
             "Bands: SR_B2 Blue, SR_B3 Green, SR_B4 Red, "
             "SR_B5 NIR, SR_B6 SWIR1, SR_B7 SWIR2."
+        ),
+    ),
+    SensorAvailabilityPeriod(
+        sensor=LandsatSensor.S2,
+        collection_id="COPERNICUS/S2_SR_HARMONIZED",
+        spacecraft_id="SENTINEL_2",
+        operational_start=date(2017, 3, 28),
+        operational_end=None,
+        description=(
+            "Sentinel-2 MSI Surface Reflectance Harmonized "
+            "(March 2017 - present). "
+            "Bands: B2 Blue, B3 Green, B4 Red, "
+            "B8 NIR, B11 SWIR1, B12 SWIR2."
         ),
     ),
 )
@@ -659,8 +674,41 @@ class LandsatCollectionBuilder:
             self._max_cloud_cover,
         )
 
+        
+        print("STEP 1")
         collection       = self._build_merged_collection(sensors)
+
+        print("STEP 2")
         collection, tags = self._apply_all_filters(collection)
+
+        print("STEP 3")
+
+        # ---------------- DEBUG ----------------
+        print("Collection size:", collection.size().getInfo())
+
+        if collection.size().getInfo() > 0:
+            first = collection.first()
+            print(first.bandNames().getInfo())
+            print("PROPERTIES:")
+            print(first.propertyNames().getInfo())
+
+            print("=" * 80)
+
+            print("DICTIONARY:")
+            print(first.toDictionary().getInfo())
+
+            print("=" * 80)
+
+            print("BANDS:")
+            print(first.bandNames().getInfo())
+
+        else:
+            print("Collection is EMPTY")
+
+        print("COLLECTION SIZE:")
+        print(collection.size().getInfo())
+        print("=" * 80 + "\n")
+        # ---------------------------------------  
 
         if validate_not_empty:
             self._check_not_empty(collection)
@@ -723,45 +771,94 @@ class LandsatCollectionBuilder:
                 _DEFAULT_CLOUD_COVER_PCT,
             )
 
-    def _resolve_sensors(self) -> list[LandsatSensor]:
-        """
-        Return the list of sensors to use in this build.
+    # def _resolve_sensors(self) -> list[LandsatSensor]:
+    #     """
+    #     Return the list of sensors to use in this build.
 
-        For manual selection: returns the explicitly provided list.
-        For auto-selection: finds all sensors operational during the
-        configured date range.
+    #     For manual selection: returns the explicitly provided list.
+    #     For auto-selection: finds all sensors operational during the
+    #     configured date range.
 
-        Raises:
-            InvalidValueError: Auto-selection finds no sensor for the range.
+    #     Raises:
+    #         InvalidValueError: Auto-selection finds no sensor for the range.
+    #     """
+    #     if not self._auto_sensors and self._sensors is not None:
+    #         return list(self._sensors)
+
+    #     # Auto-selection: find sensors that overlap with the date range.
+    #     start_dt = datetime.strptime(self._start_date, _DATE_FORMAT).date()
+    #     end_dt   = datetime.strptime(self._end_date,   _DATE_FORMAT).date()
+
+    #     available = [
+    #         period.sensor
+    #         for period in SENSOR_AVAILABILITY
+    #         if period.overlaps_with(start_dt, end_dt)
+    #     ]
+
+    #     if not available:
+    #         raise InvalidValueError(
+    #             field="date_range",
+    #             value=f"{self._start_date} to {self._end_date}",
+    #             reason=(
+    #                 "No Landsat Collection 2 Level-2 sensor was operational "
+    #                 "during this date range. "
+    #                 f"Valid range: {SENSOR_AVAILABILITY[0].operational_start} "
+    #                 f"to present."
+    #             ),
+    #         )
+
+    #     self._logger.debug(
+    #         "Auto-selected sensors: %s", [s.name for s in available]
+    #     )
+    #     return available
+
+    def _resolve_sensors(
+        self,
+    ) -> list[LandsatSensor]:
         """
+        Resolve sensors.
+
+        If Sentinel-2 is configured, always use Sentinel-2 only.
+        Otherwise fall back to the configured/manual Landsat sensors.
+        """
+
+        # Manual sensor selection
         if not self._auto_sensors and self._sensors is not None:
             return list(self._sensors)
 
-        # Auto-selection: find sensors that overlap with the date range.
-        start_dt = datetime.strptime(self._start_date, _DATE_FORMAT).date()
-        end_dt   = datetime.strptime(self._end_date,   _DATE_FORMAT).date()
+        # Config explicitly requests Sentinel-2
+        if (
+            "COPERNICUS/S2_SR_HARMONIZED"
+            in self._config.satellite.collections
+        ):
+            self._logger.info(
+                "Using Sentinel-2 collection."
+            )
+            return [LandsatSensor.S2]
+
+        # Otherwise keep previous Landsat behaviour
+        start_dt = datetime.strptime(
+            self._start_date,
+            _DATE_FORMAT,
+        ).date()
+
+        end_dt = datetime.strptime(
+            self._end_date,
+            _DATE_FORMAT,
+        ).date()
 
         available = [
             period.sensor
             for period in SENSOR_AVAILABILITY
-            if period.overlaps_with(start_dt, end_dt)
+            if (
+                period.sensor != LandsatSensor.S2
+                and period.overlaps_with(
+                    start_dt,
+                    end_dt,
+                )
+            )
         ]
 
-        if not available:
-            raise InvalidValueError(
-                field="date_range",
-                value=f"{self._start_date} to {self._end_date}",
-                reason=(
-                    "No Landsat Collection 2 Level-2 sensor was operational "
-                    "during this date range. "
-                    f"Valid range: {SENSOR_AVAILABILITY[0].operational_start} "
-                    f"to present."
-                ),
-            )
-
-        self._logger.debug(
-            "Auto-selected sensors: %s", [s.name for s in available]
-        )
         return available
 
     def _build_merged_collection(
@@ -835,22 +932,58 @@ class LandsatCollectionBuilder:
         """
         filters_applied: list[str] = []
 
-        collection = filter_by_date(
-            collection, self._start_date, self._end_date
-        )
-        filters_applied.append(
-            f"date: [{self._start_date}, {self._end_date})"
-        )
+        # collection = filter_by_date(
+        #     collection, self._start_date, self._end_date
+        # )
+        # filters_applied.append(
+        #     f"date: [{self._start_date}, {self._end_date})"
+        # )
 
-        collection = filter_by_bounds(collection, self._geometry)
-        filters_applied.append("bounds: AOI geometry")
+        # collection = filter_by_bounds(collection, self._geometry)
+        # filters_applied.append("bounds: AOI geometry")
+
+        # collection = filter_by_cloud_cover(
+        #     collection, self._max_cloud_cover
+        # )
+        # filters_applied.append(
+        #     f"cloud_cover: <= {self._max_cloud_cover:.1f}%"
+        # )
+
+        # return collection, filters_applied
+
+        # print("Raw:", collection.size().getInfo())
+
+        collection = filter_by_date(
+            collection,
+            self._start_date,
+            self._end_date,
+        )
+        # print("After date:", collection.size().getInfo())
+
+        collection = filter_by_bounds(
+            collection,
+            self._geometry,
+        )
+        # print("After bounds:", collection.size().getInfo())
+
+        collections = self._config.satellite.collections
+
+        if "COPERNICUS/S2_SR_HARMONIZED" in collections:
+            cloud_property = "CLOUDY_PIXEL_PERCENTAGE"
+        else:
+            cloud_property = "CLOUD_COVER"
 
         collection = filter_by_cloud_cover(
-            collection, self._max_cloud_cover
+            collection,
+            self._max_cloud_cover,
+            property_name=cloud_property,
         )
+
         filters_applied.append(
-            f"cloud_cover: <= {self._max_cloud_cover:.1f}%"
+            f"{cloud_property} <= {self._max_cloud_cover:.1f}%"
         )
+
+        # print("After cloud:", collection.size().getInfo())
 
         return collection, filters_applied
 
